@@ -1,0 +1,108 @@
+@page "/request-activation"
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Request Account Activation - RemixHub</PageTitle>
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <h2 class="text-center mb-4">Resend Activation Email</h2>
+                
+                @if (success)
+                {
+                    <div class="alert alert-success">
+                        <h4 class="alert-heading">Email Sent!</h4>
+                        <p>We've sent you a new activation link. Please check your inbox.</p>
+                        <p>If you don't receive the email within a few minutes, please check your spam folder.</p>
+                    </div>
+                    <div class="text-center">
+                        <a href="login" class="btn btn-primary">Return to Login</a>
+                    </div>
+                }
+                else
+                {
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+                    
+                    <p class="text-muted">Enter your email address below and we'll send you a new activation link.</p>
+                    
+                    <EditForm Model="model" OnValidSubmit="HandleSubmit">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <InputText id="email" @bind-Value="model.Email" class="form-control" />
+                            <ValidationMessage For="@(() => model.Email)" class="text-danger" />
+                        </div>
+                        
+                        <div class="d-grid mb-3">
+                            <button type="submit" class="btn btn-primary" disabled="@isLoading">
+                                @if (isLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    <span class="ms-1">Processing...</span>
+                                }
+                                else
+                                {
+                                    <span>Send Activation Link</span>
+                                }
+                            </button>
+                        </div>
+                        
+                        <div class="text-center small">
+                            <a href="login">Back to Login</a>
+                        </div>
+                    </EditForm>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ActivationRequestModel model = new ActivationRequestModel();
+    private bool isLoading = false;
+    private bool success = false;
+    private string errorMessage = string.Empty;
+
+    public class ActivationRequestModel
+    {
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Please enter a valid email address")]
+        public string Email { get; set; }
+    }
+
+    private async Task HandleSubmit()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        
+        try
+        {
+            var result = await AuthService.ResendActivationEmailAsync(model.Email);
+            
+            if (result)
+            {
+                success = true;
+            }
+            else
+            {
+                errorMessage = "An error occurred. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred. Please try again.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

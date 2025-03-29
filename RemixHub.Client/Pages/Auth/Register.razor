@@ -1,6 +1,7 @@
 @page "/register"
 @inject IAuthService AuthService
 @inject NavigationManager NavigationManager
+@inject HttpClient HttpClient
 
 <PageTitle>Register - RemixHub</PageTitle>
 
@@ -15,6 +16,19 @@
                     <div class="alert alert-danger">@errorMessage</div>
                 }
                 
+                @if (debugErrors?.Any() == true)
+                {
+                    <div class="alert alert-warning">
+                        <h6>Debug Validation Errors:</h6>
+                        <ul>
+                            @foreach(var err in debugErrors)
+                            {
+                                <li>@err</li>
+                            }
+                        </ul>
+                    </div>
+                }
+                
                 @if (registrationSuccess)
                 {
                     <div class="alert alert-success">
@@ -26,7 +40,7 @@
                 }
                 else
                 {
-                    <EditForm Model="registerModel" OnValidSubmit="HandleRegistration">
+                    <EditForm Model="registerModel" OnValidSubmit="HandleRegistration" OnInvalidSubmit="LogInvalidSubmit">
                         <DataAnnotationsValidator />
                         
                         <div class="mb-3">
@@ -55,14 +69,27 @@
                         </div>
                         
                         <div class="mb-3">
-                            <div id="recaptcha"></div>
-                            @if (!string.IsNullOrEmpty(captchaError))
-                            {
-                                <div class="text-danger">@captchaError</div>
-                            }
+                            <label for="captchaResponse" class="form-label">Enter CAPTCHA</label>
+                            <div class="d-flex align-items-center mb-2">
+                                @if (!string.IsNullOrEmpty(captchaImage))
+                                {
+                                    <img src="@captchaImage" alt="CAPTCHA" class="img-fluid" style="max-height:80px;" />
+                                    <button type="button" class="btn btn-link ms-2" @onclick="RefreshCaptcha" title="Refresh CAPTCHA">
+                                        <i class="bi bi-arrow-clockwise" style="font-size: 1.5rem;"></i>
+                                    </button>
+                                }
+                            </div>
+                            <InputText id="captchaResponse" @bind-Value="registerModel.CaptchaResponse" class="form-control" />
+                            <ValidationMessage For="@(() => registerModel.CaptchaResponse)" class="text-danger" />
+                            
+                            <div class="mt-2 small text-muted">
+                                <strong>Debug:</strong> 
+                                <div>CaptchaKey = @(registerModel.CaptchaKey ?? "null")</div>
+                                <div>CaptchaResponse = @(registerModel.CaptchaResponse ?? "empty")</div>
+                            </div>
                         </div>
                         
-                        <div class="d-grid mb-3">
+                        <div class="d-grid gap-2 mb-3">
                             <button type="submit" class="btn btn-primary" disabled="@isLoading">
                                 @if (isLoading)
                                 {
@@ -73,6 +100,9 @@
                                 {
                                     <span>Register</span>
                                 }
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="TestDirectSubmission">
+                                Test Direct Submission
                             </button>
                         </div>
                         
@@ -91,41 +121,109 @@
     private bool isLoading = false;
     private bool registrationSuccess = false;
     private string errorMessage = string.Empty;
-    private string captchaError = string.Empty;
+    private string captchaImage = string.Empty;
+    private List<string> debugErrors;
 
-    // In a real implementation, you would use JavaScript interop to initialize reCAPTCHA
-    // For this example, we'll simulate the captcha token
-    
+    public class CaptchaResponse
+    {
+        public string Key { get; set; }
+        public string Image { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCaptchaAsync();
+    }
+
+    private async Task LoadCaptchaAsync()
+    {
+        try
+        {
+            var captcha = await HttpClient.GetFromJsonAsync<CaptchaResponse>("api/captcha/generate");
+            if(captcha != null)
+            {
+                registerModel.CaptchaKey = captcha.Key;
+                captchaImage = captcha.Image;
+                Console.WriteLine($"Loaded Captcha - Key: {captcha.Key}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error loading CAPTCHA: " + ex.Message);
+        }
+    }
+
+    private async Task RefreshCaptcha()
+    {
+        await LoadCaptchaAsync();
+    }
+
     private async Task HandleRegistration()
     {
+        Console.WriteLine("=== REGISTRATION SUBMISSION ===");
+        Console.WriteLine($"Username: {registerModel.Username}");
+        Console.WriteLine($"Email: {registerModel.Email}");
+        Console.WriteLine($"CaptchaKey: {registerModel.CaptchaKey}");
+        Console.WriteLine($"CaptchaResponse: {registerModel.CaptchaResponse}");
+        
         isLoading = true;
         errorMessage = string.Empty;
-        captchaError = string.Empty;
-        
-        // Simulate captcha verification
-        registerModel.RecaptchaToken = "simulated-captcha-token";
+        debugErrors = null;
         
         try
         {
             var result = await AuthService.RegisterAsync(registerModel);
-            
             if (result)
             {
                 registrationSuccess = true;
             }
             else
             {
-                errorMessage = "Registration failed. Please try again.";
+                errorMessage = "Registration failed. Please check the console for more details.";
             }
         }
         catch (Exception ex)
         {
-            errorMessage = "An error occurred during registration. Please try again.";
-            Console.WriteLine(ex.Message);
+            errorMessage = $"An error occurred: {ex.Message}";
+            Console.WriteLine($"Registration exception: {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+            }
         }
         finally
         {
             isLoading = false;
         }
+    }
+
+    private void LogInvalidSubmit(EditContext editContext)
+    {
+        errorMessage = "Form validation failed.";
+        debugErrors = editContext.GetValidationMessages().ToList();
+        foreach (var msg in debugErrors)
+        {
+            Console.WriteLine("Validation Error: " + msg);
+        }
+    }
+
+    private async Task TestDirectSubmission()
+    {
+        Console.WriteLine("Test direct submission initiated");
+        Console.WriteLine($"CaptchaKey: {registerModel.CaptchaKey}");
+        Console.WriteLine($"CaptchaResponse: {registerModel.CaptchaResponse}");
+        
+        try {
+            var result = await AuthService.RegisterAsync(registerModel);
+            Console.WriteLine($"Direct submission result: {result}");
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Direct submission error: {ex.Message}");
+        }
+    }
+
+    private void OnCaptchaChanged(ChangeEventArgs e)
+    {
+        Console.WriteLine("Captcha input changed to: " + e.Value?.ToString());
     }
 }

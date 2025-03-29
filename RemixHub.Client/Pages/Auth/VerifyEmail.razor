@@ -1,0 +1,103 @@
+@page "/verify-email"
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject HttpClient HttpClient
+@using System.Web
+
+<PageTitle>Verify Email - RemixHub</PageTitle>
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-body p-4 text-center">
+                <h2 class="mb-4">Email Verification</h2>
+                
+                @if (loading)
+                {
+                    <div class="d-flex justify-content-center my-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Verifying...</span>
+                        </div>
+                        <span class="ms-2">Verifying your email...</span>
+                    </div>
+                }
+                else if (success)
+                {
+                    <div class="mb-4">
+                        <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
+                    </div>
+                    <h4 class="text-success">Email Verified!</h4>
+                    <p class="mb-4">Your email has been successfully verified. You can now login to your account.</p>
+                    <a href="login" class="btn btn-primary">Login</a>
+                }
+                else
+                {
+                    <div class="mb-4">
+                        <i class="bi bi-x-circle text-danger" style="font-size: 4rem;"></i>
+                    </div>
+                    <h4 class="text-danger">Verification Failed</h4>
+                    <p class="mb-4">@errorMessage</p>
+                    <div class="d-grid gap-2">
+                        <a href="/" class="btn btn-primary">Go to Homepage</a>
+                        <a href="login" class="btn btn-outline-secondary">Try Logging In</a>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool loading = true;
+    private bool success = false;
+    private string errorMessage = "Unable to verify your email. The verification link may be invalid or expired.";
+    
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string UserId { get; set; }
+    
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string Token { get; set; }
+    
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(UserId) || string.IsNullOrEmpty(Token))
+        {
+            loading = false;
+            errorMessage = "Missing verification parameters. Please check your email link.";
+            return;
+        }
+
+        try
+        {
+            // Clean and decode the token - remove any trailing quotes and properly decode
+            string cleanToken = Token.TrimEnd('\'');
+            string decodedToken = HttpUtility.UrlDecode(cleanToken);
+            
+            // Log the exact token being sent for debugging
+            Console.WriteLine($"Verifying email - UserId: {UserId}");
+            Console.WriteLine($"Original Token: {Token}");
+            Console.WriteLine($"Cleaned Token: {cleanToken}");
+            Console.WriteLine($"Decoded Token: {decodedToken}");
+            
+            // Call the auth service to verify the email
+            bool verificationResult = await AuthService.VerifyEmailAsync(UserId, decodedToken);
+            success = verificationResult;
+            
+            if (!success)
+            {
+                errorMessage = "Verification failed. The link may be invalid or expired.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error verifying email: {ex.Message}");
+            errorMessage = "An error occurred during verification. Please try again later.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+}

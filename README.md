@@ -15,6 +15,7 @@ RemixHub is a collaborative music sharing and remix platform built with Blazor W
 - .NET 9.0 SDK
 - Visual Studio 2022 or Visual Studio Code
 - A modern web browser
+- Entity Framework Core CLI tools
 
 ## 🚀 Getting Started
 
@@ -32,11 +33,12 @@ cd remixhub
 ```json
 "Email": {
   "SmtpServer": "your-smtp-server.com",
-  "SmtpPort": 587,
-  "SmtpUsername": "your-username",
-  "SmtpPassword": "your-password",
-  "SenderEmail": "noreply@yourdomain.com",
-  "SenderName": "RemixHub"
+  "SmtpPort": 1025,
+  "SmtpUsername": "notifications@yourdomain.com",
+  "SmtpPassword": "your_smtp_password",
+  "SenderEmail": "notifications@yourdomain.com",
+  "SenderName": "RemixHub",
+  "EnableSsl": false
 }
 ```
 
@@ -49,13 +51,15 @@ cd remixhub
 "JwtExpireDays": 7
 ```
 
-3. (Optional) If you're using Google reCAPTCHA, add your secret key:
+3. Configure the client app URL to ensure proper email links:
 
 ```json
-"RecaptchaSecretKey": "your-recaptcha-secret-key"
+"AppUrl": "http://localhost:5002"
 ```
 
 ### Database Setup
+
+#### Installing EF Core Tools
 
 First, install the Entity Framework Core tools globally:
 
@@ -63,18 +67,72 @@ First, install the Entity Framework Core tools globally:
 dotnet tool install --global dotnet-ef
 ```
 
-Or if you already have it installed, ensure it's the latest version:
+Or update to the latest version if already installed:
 
 ```bash
 dotnet tool update --global dotnet-ef
 ```
 
-Now you can create the database:
+#### Creating the Database
+
+Navigate to the server project directory:
 
 ```bash
 cd RemixHub.Server
+```
+
+Create the initial database (this applies the migrations):
+
+```bash
 dotnet ef database update
 ```
+
+This will:
+1. Create the SQLite database file (RemixHub.db)
+2. Create all required tables:
+   - ASP.NET Identity tables (AspNetUsers, AspNetRoles, etc.)
+   - Application tables (Tracks, Stems, Genres, etc.)
+   - All relationships and constraints
+
+#### Database Migrations Workflow
+
+When you make changes to your data models:
+
+1. Create a new migration:
+   ```bash
+   dotnet ef migrations add MigrationName
+   ```
+
+2. Apply the migration to update the database:
+   ```bash
+   dotnet ef database update
+   ```
+
+#### Common Migration Commands
+
+```bash
+# List all migrations
+dotnet ef migrations list
+
+# Generate SQL script (instead of directly applying changes)
+dotnet ef migrations script -o migrate.sql
+
+# Roll back to a specific migration
+dotnet ef database update MigrationName
+
+# Remove the last migration (if not applied to database)
+dotnet ef migrations remove
+
+# Reset database (drop and recreate)
+dotnet ef database drop --force
+dotnet ef database update
+```
+
+#### Database Seeding
+
+Initial seed data is created when you first apply migrations, including:
+- Default roles (Admin, User)
+- Basic genres and instrument types
 
 ### Running the Application
 
@@ -102,8 +160,8 @@ dotnet run
 
 ### Accessing the Application
 
-- API Server: https://localhost:7001
-- Blazor WebAssembly Client: https://localhost:5001
+- API Server: http://localhost:5001
+- Blazor WebAssembly Client: http://localhost:5002
 
 ## 🔑 Default Admin Account
 
@@ -114,6 +172,13 @@ When you first run the application, you can create an admin account by registeri
 UPDATE AspNetUserRoles 
 SET RoleId = (SELECT Id FROM AspNetRoles WHERE Name = 'Admin')
 WHERE UserId = 'your-user-id';
+```
+
+Alternative approach using EF Core:
+```csharp
+// In AdminController or a custom admin setup endpoint
+var user = await _userManager.FindByEmailAsync("admin@example.com");
+await _userManager.AddToRoleAsync(user, "Admin");
 ```
 
 ## 📁 Project Structure
@@ -138,9 +203,8 @@ WHERE UserId = 'your-user-id';
 
 - JWT authentication for API access
 - Role-based authorization
-- Email verification
-- Password reset functionality
-- Input validation
+- Custom CAPTCHA for registration security
+- Email verification for new accounts
 
 ## 🔧 Technical Implementation
 

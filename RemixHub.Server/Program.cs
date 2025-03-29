@@ -54,17 +54,16 @@ builder.Services.AddAuthentication(options =>
 // Custom services
 builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddTransient<IAudioMetadataService, AudioMetadataService>();
+builder.Services.AddSingleton<ICaptchaService, CaptchaService>(); // Ensure DI picks up ILogger injection automatically
 
 // CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("CorsPolicy", policy =>
+    options.AddPolicy("CorsPolicy", policyBuilder =>
     {
-        var clientUrl = builder.Configuration["AppUrl"] ?? "https://localhost:7002";
-        policy.WithOrigins(clientUrl)
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
+        policyBuilder.WithOrigins("http://localhost:5002")
+                     .AllowAnyHeader()
+                     .AllowAnyMethod();
     });
 });
 
@@ -83,10 +82,11 @@ else
     app.UseHsts();
 }
 
+app.UseCors("CorsPolicy");
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-app.UseCors("CorsPolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();

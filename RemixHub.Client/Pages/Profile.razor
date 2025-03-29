@@ -1,0 +1,205 @@
+@page "/profile"
+@attribute [Authorize]
+@inject IProfileService ProfileService
+@inject NavigationManager NavigationManager
+
+<PageTitle>My Profile - RemixHub</PageTitle>
+
+<div class="container my-4">
+    <h1>My Profile</h1>
+    <p class="lead">Update your profile information</p>
+    
+    @if (loading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="ms-2">Loading profile...</span>
+        </div>
+    }
+    else
+    {
+        @if (updateSuccess)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                Your profile has been updated successfully.
+                <button type="button" class="btn-close" @onclick="() => updateSuccess = false"></button>
+            </div>
+        }
+        
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @errorMessage
+                <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+            </div>
+        }
+        
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            @if (string.IsNullOrEmpty(profile.AvatarUrl))
+                            {
+                                <div class="rounded-circle bg-secondary text-white d-inline-flex justify-content-center align-items-center" style="width: 150px; height: 150px; font-size: 4rem;">
+                                    @(string.IsNullOrEmpty(profile.DisplayName) ? "?" : profile.DisplayName[0])
+                                </div>
+                            }
+                            else
+                            {
+                                <img src="@profile.AvatarUrl" alt="@profile.DisplayName" class="rounded-circle img-fluid" style="width: 150px; height: 150px; object-fit: cover;" />
+                            }
+                        </div>
+                        <h4>@profile.DisplayName</h4>
+                        <p>@profile.UserName</p>
+                        <div class="d-flex justify-content-center gap-4 mb-3">
+                            <div>
+                                <span class="d-block fw-bold">@profile.TrackCount</span>
+                                <small>Tracks</small>
+                            </div>
+                            <div>
+                                <span class="d-block fw-bold">@profile.RemixCount</span>
+                                <small>Remixes</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <small class="text-muted">Joined @profile.CreatedAt.ToString("MMMM yyyy")</small>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Account Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="text" class="form-control-plaintext" value="@profile.Email" readonly />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control-plaintext" value="@profile.UserName" readonly />
+                        </div>
+                        <a href="change-password" class="btn btn-outline-secondary w-100">Change Password</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Profile Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <EditForm Model="@profile" OnValidSubmit="UpdateProfile">
+                            <DataAnnotationsValidator />
+                            
+                            <div class="mb-3">
+                                <label for="displayName" class="form-label">Display Name</label>
+                                <InputText id="displayName" @bind-Value="profile.DisplayName" class="form-control" />
+                                <div class="form-text">This is how you'll appear on the platform</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="avatarUrl" class="form-label">Avatar URL</label>
+                                <InputText id="avatarUrl" @bind-Value="profile.AvatarUrl" class="form-control" />
+                                <div class="form-text">Direct link to your profile image (we'll add upload functionality later)</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="bio" class="form-label">Bio</label>
+                                <InputTextArea id="bio" @bind-Value="profile.Bio" class="form-control" rows="4" />
+                                <div class="form-text">Tell us a bit about yourself and your music</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="socialLinks" class="form-label">Social Media Links</label>
+                                <InputTextArea id="socialLinks" @bind-Value="profile.SocialLinks" class="form-control" rows="3" />
+                                <div class="form-text">Add your Soundcloud, Bandcamp, etc. (one per line)</div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary" disabled="@updating">
+                                    @if (updating)
+                                    {
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                        <span class="ms-1">Saving...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Save Changes</span>
+                                    }
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private UserProfileViewModel profile = new UserProfileViewModel();
+    private bool loading = true;
+    private bool updating = false;
+    private bool updateSuccess = false;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        loading = true;
+        
+        try
+        {
+            profile = await ProfileService.GetProfileAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load profile data. Please try again.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task UpdateProfile()
+    {
+        updating = true;
+        errorMessage = string.Empty;
+        updateSuccess = false;
+        
+        try
+        {
+            var result = await ProfileService.UpdateProfileAsync(profile);
+            
+            if (result)
+            {
+                updateSuccess = true;
+            }
+            else
+            {
+                errorMessage = "Failed to update profile. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred while updating your profile.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            updating = false;
+        }
+    }
+}

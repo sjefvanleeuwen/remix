@@ -1,0 +1,131 @@
+@page "/register"
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Register - RemixHub</PageTitle>
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <h2 class="text-center mb-4">Create an Account</h2>
+                
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger">@errorMessage</div>
+                }
+                
+                @if (registrationSuccess)
+                {
+                    <div class="alert alert-success">
+                        <h4 class="alert-heading">Registration Successful!</h4>
+                        <p>Please check your email to verify your account.</p>
+                        <hr>
+                        <p class="mb-0">Once verified, you'll be able to login and start using RemixHub.</p>
+                    </div>
+                }
+                else
+                {
+                    <EditForm Model="registerModel" OnValidSubmit="HandleRegistration">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <InputText id="username" @bind-Value="registerModel.Username" class="form-control" />
+                            <ValidationMessage For="@(() => registerModel.Username)" class="text-danger" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <InputText id="email" @bind-Value="registerModel.Email" class="form-control" />
+                            <ValidationMessage For="@(() => registerModel.Email)" class="text-danger" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <InputText id="password" @bind-Value="registerModel.Password" type="password" class="form-control" />
+                            <ValidationMessage For="@(() => registerModel.Password)" class="text-danger" />
+                            <small class="form-text text-muted">Password must be at least 8 characters with uppercase, lowercase, numbers, and special characters.</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">Confirm Password</label>
+                            <InputText id="confirmPassword" @bind-Value="registerModel.ConfirmPassword" type="password" class="form-control" />
+                            <ValidationMessage For="@(() => registerModel.ConfirmPassword)" class="text-danger" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div id="recaptcha"></div>
+                            @if (!string.IsNullOrEmpty(captchaError))
+                            {
+                                <div class="text-danger">@captchaError</div>
+                            }
+                        </div>
+                        
+                        <div class="d-grid mb-3">
+                            <button type="submit" class="btn btn-primary" disabled="@isLoading">
+                                @if (isLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    <span class="ms-1">Processing...</span>
+                                }
+                                else
+                                {
+                                    <span>Register</span>
+                                }
+                            </button>
+                        </div>
+                        
+                        <div class="text-center small">
+                            Already have an account? <a href="login">Login</a>
+                        </div>
+                    </EditForm>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterViewModel registerModel = new RegisterViewModel();
+    private bool isLoading = false;
+    private bool registrationSuccess = false;
+    private string errorMessage = string.Empty;
+    private string captchaError = string.Empty;
+
+    // In a real implementation, you would use JavaScript interop to initialize reCAPTCHA
+    // For this example, we'll simulate the captcha token
+    
+    private async Task HandleRegistration()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        captchaError = string.Empty;
+        
+        // Simulate captcha verification
+        registerModel.RecaptchaToken = "simulated-captcha-token";
+        
+        try
+        {
+            var result = await AuthService.RegisterAsync(registerModel);
+            
+            if (result)
+            {
+                registrationSuccess = true;
+            }
+            else
+            {
+                errorMessage = "Registration failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during registration. Please try again.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

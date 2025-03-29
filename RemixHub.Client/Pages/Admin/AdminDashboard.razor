@@ -1,0 +1,160 @@
+@page "/admin"
+@attribute [Authorize(Roles = "Admin")]
+@inject NavigationManager NavigationManager
+
+<PageTitle>Admin Dashboard - RemixHub</PageTitle>
+
+<div class="container my-4">
+    <h1>Admin Dashboard</h1>
+    <p class="lead">Manage and moderate the RemixHub platform</p>
+    
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white mb-3">
+                <div class="card-body text-center">
+                    <h3 class="display-4">0</h3>
+                    <p class="mb-0">Pending Tracks</p>
+                </div>
+                <div class="card-footer d-grid">
+                    <a href="admin/tracks" class="btn btn-light btn-sm">Moderate Tracks</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-info text-white mb-3">
+                <div class="card-body text-center">
+                    <h3 class="display-4">0</h3>
+                    <p class="mb-0">Users</p>
+                </div>
+                <div class="card-footer d-grid">
+                    <a href="admin/users" class="btn btn-light btn-sm">Manage Users</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success text-white mb-3">
+                <div class="card-body text-center">
+                    <h3 class="display-4">0</h3>
+                    <p class="mb-0">Genres</p>
+                </div>
+                <div class="card-footer d-grid">
+                    <a href="admin/genres" class="btn btn-light btn-sm">Manage Genres</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark mb-3">
+                <div class="card-body text-center">
+                    <h3 class="display-4">0</h3>
+                    <p class="mb-0">Reports</p>
+                </div>
+                <div class="card-footer d-grid">
+                    <a href="admin/reports" class="btn btn-dark btn-sm">View Reports</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <a href="#" class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between">
+                                <h6 class="mb-1">New track uploaded</h6>
+                                <small class="text-muted">5 mins ago</small>
+                            </div>
+                            <p class="mb-1">Track "Sample Track" by user123</p>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between">
+                                <h6 class="mb-1">New user registered</h6>
+                                <small class="text-muted">2 hours ago</small>
+                            </div>
+                            <p class="mb-1">User newmember123 joined the platform</p>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between">
+                                <h6 class="mb-1">New remix created</h6>
+                                <small class="text-muted">3 hours ago</small>
+                            </div>
+                            <p class="mb-1">Remix of "Original Track" by remixer456</p>
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="admin/activity" class="btn btn-outline-primary btn-sm">View All Activity</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">System Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <a href="admin/email-templates" class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">Email Templates</h6>
+                                    <p class="mb-1 text-muted">Manage system email templates</p>
+                                </div>
+                                <span class="bi bi-chevron-right"></span>
+                            </div>
+                        </a>
+                        <a href="admin/site-settings" class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">Site Settings</h6>
+                                    <p class="mb-1 text-muted">Configure global platform settings</p>
+                                </div>
+                                <span class="bi bi-chevron-right"></span>
+                            </div>
+                        </a>
+                        <a href="admin/instruments" class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">Instrument Types</h6>
+                                    <p class="mb-1 text-muted">Manage instrument categorization</p>
+                                </div>
+                                <span class="bi bi-chevron-right"></span>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Platform Stats</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <p><strong>Total Tracks:</strong> 0</p>
+                            <p><strong>Total Remixes:</strong> 0</p>
+                            <p><strong>Total Stems:</strong> 0</p>
+                        </div>
+                        <div class="col-6">
+                            <p><strong>Active Users:</strong> 0</p>
+                            <p><strong>New Users (7d):</strong> 0</p>
+                            <p><strong>New Tracks (7d):</strong> 0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="admin/stats" class="btn btn-outline-primary btn-sm">View Detailed Stats</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

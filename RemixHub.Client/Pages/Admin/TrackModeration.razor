@@ -1,0 +1,228 @@
+@page "/admin/tracks"
+@attribute [Authorize(Roles = "Admin")]
+@inject NavigationManager NavigationManager
+@inject ITrackService TrackService
+@inject HttpClient HttpClient
+
+<PageTitle>Track Moderation - RemixHub</PageTitle>
+
+<div class="container my-4">
+    <h1>Track Moderation</h1>
+    <p class="lead">Review and approve user-uploaded tracks</p>
+    
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Pending Tracks</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="RefreshTracks">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    @if (loading)
+                    {
+                        <div class="d-flex justify-content-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading pending tracks...</span>
+                        </div>
+                    }
+                    else if (pendingTracks == null || !pendingTracks.Any())
+                    {
+                        <div class="alert alert-info">
+                            No pending tracks to moderate at this time.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Artist</th>
+                                        <th>Genre</th>
+                                        <th>Uploaded By</th>
+                                        <th>Upload Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var track in pendingTracks)
+                                    {
+                                        <tr>
+                                            <td>@track.Title</td>
+                                            <td>@track.Artist</td>
+                                            <td>@track.GenreName @(track.SubgenreName != null ? $"/ {track.SubgenreName}" : "")</td>
+                                            <td>@track.UserName</td>
+                                            <td>@track.UploadDate.ToString("MMM dd, yyyy")</td>
+                                            <td>
+                                                <div class="btn-group">
+                                                    <a href="@($"track/{track.TrackId}")" class="btn btn-sm btn-info" target="_blank">
+                                                        <i class="bi bi-eye"></i> View
+                                                    </a>
+                                                    <button class="btn btn-sm btn-success" @onclick="() => ApproveTrack(track.TrackId)">
+                                                        <i class="bi bi-check-lg"></i> Approve
+                                                    </button>
+                                                    <button class="btn btn-sm btn-danger" @onclick="() => ShowRejectModal(track.TrackId)">
+                                                        <i class="bi bi-x-lg"></i> Reject
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recently Moderated Tracks -->
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recently Moderated Tracks</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        This feature will be available in a future update.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (showRejectModal)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reject Track</h5>
+                    <button type="button" class="btn-close" @onclick="HideRejectModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to reject this track? This action cannot be undone.</p>
+                    <div class="mb-3">
+                        <label for="rejectReason" class="form-label">Reason for rejection:</label>
+                        <textarea id="rejectReason" @bind="rejectReason" class="form-control" rows="3" placeholder="Explain why this track is being rejected"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideRejectModal">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmRejectTrack">Reject Track</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    private List<TrackViewModel> pendingTracks;
+    private bool loading = true;
+    private bool showRejectModal = false;
+    private int trackToReject;
+    private string rejectReason;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPendingTracksAsync();
+    }
+
+    private async Task LoadPendingTracksAsync()
+    {
+        loading = true;
+        
+        try
+        {
+            pendingTracks = await HttpClient.GetFromJsonAsync<List<TrackViewModel>>("api/admin/tracks/pending");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading pending tracks: {ex.Message}");
+            pendingTracks = new List<TrackViewModel>();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task RefreshTracks()
+    {
+        await LoadPendingTracksAsync();
+    }
+
+    private async Task ApproveTrack(int trackId)
+    {
+        try
+        {
+            var response = await HttpClient.PostAsync($"api/admin/tracks/{trackId}/approve", null);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // Remove the track from the list
+                pendingTracks.RemoveAll(t => t.TrackId == trackId);
+                
+                // Show success message (could be implemented with a toast notification)
+            }
+            else
+            {
+                // Show error message
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error approving track: {ex.Message}");
+        }
+    }
+
+    private void ShowRejectModal(int trackId)
+    {
+        trackToReject = trackId;
+        rejectReason = string.Empty;
+        showRejectModal = true;
+    }
+
+    private void HideRejectModal()
+    {
+        showRejectModal = false;
+    }
+
+    private async Task ConfirmRejectTrack()
+    {
+        try
+        {
+            var response = await HttpClient.PostAsJsonAsync($"api/admin/tracks/{trackToReject}/reject", rejectReason);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // Remove the track from the list
+                pendingTracks.RemoveAll(t => t.TrackId == trackToReject);
+                
+                // Hide the modal
+                showRejectModal = false;
+                
+                // Show success message (could be implemented with a toast notification)
+            }
+            else
+            {
+                // Show error message
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error rejecting track: {ex.Message}");
+        }
+    }
+}

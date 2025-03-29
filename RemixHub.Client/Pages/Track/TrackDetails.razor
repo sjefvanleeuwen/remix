@@ -1,0 +1,218 @@
+@page "/track/{Id:int}"
+@using Microsoft.AspNetCore.Authorization
+@inject ITrackService TrackService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Track Details - RemixHub</PageTitle>
+
+@if (loading)
+{
+    <div class="d-flex justify-content-center my-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <span class="ms-2">Loading track details...</span>
+    </div>
+}
+else if (track == null)
+{
+    <div class="alert alert-warning">
+        Track not found or you don't have permission to view it.
+    </div>
+}
+else
+{
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <h1>@track.Title</h1>
+                <h5 class="text-muted">by @track.Artist</h5>
+                
+                <div class="mt-3">
+                    <span class="genre-badge">@track.GenreName</span>
+                    @if (!string.IsNullOrEmpty(track.SubgenreName))
+                    {
+                        <span class="genre-badge">@track.SubgenreName</span>
+                    }
+                </div>
+                
+                <div class="mt-3">
+                    <small class="text-muted me-3">
+                        <i class="bi bi-clock"></i> @FormatDuration(track.DurationSeconds)
+                    </small>
+                    <small class="text-muted me-3">
+                        <i class="bi bi-music-note"></i> @(track.Bpm != null ? $"{track.Bpm} BPM" : "Unknown BPM")
+                    </small>
+                    <small class="text-muted me-3">
+                        <i class="bi bi-music-note-list"></i> @(!string.IsNullOrEmpty(track.MusicalKey) ? track.MusicalKey : "Unknown Key")
+                    </small>
+                    <small class="text-muted">
+                        <i class="bi bi-calendar3"></i> @track.UploadDate.ToString("MMM dd, yyyy")
+                    </small>
+                </div>
+                
+                <p class="mt-3">@track.Description</p>
+                
+                <div class="mt-4">
+                    <h5>Audio</h5>
+                    <audio controls class="audio-player">
+                        <source src="@($"api/tracks/{track.TrackId}/stream")" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Track Info</h5>
+                        <ul class="list-unstyled">
+                            <li><strong>Uploaded by:</strong> @track.UserName</li>
+                            @if (!string.IsNullOrEmpty(track.Album))
+                            {
+                                <li><strong>Album:</strong> @track.Album</li>
+                            }
+                            <li><strong>Bit Rate:</strong> @track.BitRate kbps</li>
+                            <li><strong>Sample Rate:</strong> @track.SampleRate Hz</li>
+                        </ul>
+                        
+                        <div class="d-grid gap-2 mt-3">
+                            <AuthorizeView>
+                                <Authorized Context="authContext">
+                                    <a href="@($"track/{track.TrackId}/remix")" class="btn btn-success">
+                                        <i class="bi bi-arrow-repeat"></i> Create Remix
+                                    </a>
+                                </Authorized>
+                                <NotAuthorized>
+                                    <a href="@($"login?ReturnUrl={Uri.EscapeDataString($"track/{track.TrackId}/remix")}")" class="btn btn-outline-primary">
+                                        Login to Create Remix
+                                    </a>
+                                </NotAuthorized>
+                            </AuthorizeView>
+                            
+                            <button class="btn btn-outline-secondary" @onclick="() => ShowLikesModal = true">
+                                <i class="bi bi-hand-thumbs-up"></i> Like
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        @if (track.OriginalTrack != null)
+        {
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Original Track</h5>
+                    <p>This is a remix of <a href="@($"track/{track.OriginalTrack.TrackId}")">@track.OriginalTrack.Title</a> by @track.OriginalTrack.UserName</p>
+                    <p><strong>Remix Reason:</strong> @track.OriginalTrack.RemixReason</p>
+                    <p><strong>Stems Used:</strong> @track.OriginalTrack.StemsUsed</p>
+                </div>
+            </div>
+        }
+        
+        @if (track.Stems != null && track.Stems.Any())
+        {
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h3>Stems</h3>
+                    <p class="text-muted">Individual instrument tracks that make up this song</p>
+                    
+                    <div class="row">
+                        @foreach (var stem in track.Stems)
+                        {
+                            <div class="col-md-6 mb-3">
+                                <div class="stem-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h5>@stem.Name</h5>
+                                        <span class="instrument-badge">@stem.InstrumentTypeName</span>
+                                    </div>
+                                    <p class="small text-muted">@stem.Description</p>
+                                    <audio controls class="w-100">
+                                        <source src="@($"api/tracks/{track.TrackId}/stems/{stem.StemId}")" type="audio/mpeg">
+                                        Your browser does not support the audio element.
+                                    </audio>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        
+        @if (track.Remixes != null && track.Remixes.Any())
+        {
+            <div class="row">
+                <div class="col-12">
+                    <h3>Remixes</h3>
+                    <p class="text-muted">Check out how other artists have remixed this track</p>
+                    
+                    <div class="row">
+                        @foreach (var remix in track.Remixes)
+                        {
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">@remix.Title</h5>
+                                        <h6 class="card-subtitle mb-2 text-muted">by @remix.UserName</h6>
+                                        <p class="card-text small">@remix.RemixReason</p>
+                                        <small class="text-muted">@remix.CreatedAt.ToString("MMM dd, yyyy")</small>
+                                        <div class="mt-2">
+                                            <a href="@($"track/{remix.TrackId}")" class="btn btn-sm btn-primary">View Remix</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+    
+    private TrackDetailViewModel track;
+    private bool loading = true;
+    private bool ShowLikesModal = false;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTrackAsync();
+    }
+    
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadTrackAsync();
+    }
+    
+    private async Task LoadTrackAsync()
+    {
+        loading = true;
+        
+        try
+        {
+            track = await TrackService.GetTrackAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading track: {ex.Message}");
+            track = null;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+    
+    private string FormatDuration(int seconds)
+    {
+        var timeSpan = TimeSpan.FromSeconds(seconds);
+        return timeSpan.TotalHours >= 1 
+            ? $"{(int)timeSpan.TotalHours}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}" 
+            : $"{timeSpan.Minutes}:{timeSpan.Seconds:D2}";
+    }
+}

@@ -1,0 +1,100 @@
+@page "/login"
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Login - RemixHub</PageTitle>
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <h2 class="text-center mb-4">Login</h2>
+                
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger">@errorMessage</div>
+                }
+                
+                <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+                    <DataAnnotationsValidator />
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <InputText id="email" @bind-Value="loginModel.Email" class="form-control" />
+                        <ValidationMessage For="@(() => loginModel.Email)" class="text-danger" />
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <InputText id="password" @bind-Value="loginModel.Password" type="password" class="form-control" />
+                        <ValidationMessage For="@(() => loginModel.Password)" class="text-danger" />
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <InputCheckbox id="rememberMe" @bind-Value="loginModel.RememberMe" class="form-check-input" />
+                        <label class="form-check-label" for="rememberMe">Remember me</label>
+                    </div>
+                    
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-primary" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                <span class="ms-1">Loading...</span>
+                            }
+                            else
+                            {
+                                <span>Login</span>
+                            }
+                        </button>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between small">
+                        <a href="forgot-password">Forgot password?</a>
+                        <a href="register">Need an account? Register</a>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginViewModel loginModel = new LoginViewModel();
+    private bool isLoading = false;
+    private string errorMessage = string.Empty;
+    
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string ReturnUrl { get; set; }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        
+        try
+        {
+            var result = await AuthService.LoginAsync(loginModel);
+            
+            if (result)
+            {
+                var url = string.IsNullOrEmpty(ReturnUrl) ? "/" : ReturnUrl;
+                NavigationManager.NavigateTo(url);
+            }
+            else
+            {
+                errorMessage = "Invalid email or password. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during login. Please try again.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

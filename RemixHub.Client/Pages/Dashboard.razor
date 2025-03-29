@@ -1,0 +1,195 @@
+@page "/dashboard"
+@attribute [Authorize]
+@inject IProfileService ProfileService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Dashboard - RemixHub</PageTitle>
+
+<div class="container my-4">
+    <h1>Dashboard</h1>
+    <p class="lead">Manage your tracks and remixes</p>
+    
+    @if (loading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="ms-2">Loading your data...</span>
+        </div>
+    }
+    else
+    {
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            @if (string.IsNullOrEmpty(profile.AvatarUrl))
+                            {
+                                <div class="rounded-circle bg-secondary text-white d-inline-flex justify-content-center align-items-center" style="width: 100px; height: 100px; font-size: 2.5rem;">
+                                    @(string.IsNullOrEmpty(profile.DisplayName) ? "?" : profile.DisplayName[0])
+                                </div>
+                            }
+                            else
+                            {
+                                <img src="@profile.AvatarUrl" alt="@profile.DisplayName" class="rounded-circle img-fluid" style="width: 100px; height: 100px; object-fit: cover;" />
+                            }
+                        </div>
+                        <h4>@profile.DisplayName</h4>
+                        <p>@profile.UserName</p>
+                        <div class="d-flex justify-content-center gap-3">
+                            <div>
+                                <span class="d-block fw-bold">@profile.TrackCount</span>
+                                <small>Tracks</small>
+                            </div>
+                            <div>
+                                <span class="d-block fw-bold">@profile.RemixCount</span>
+                                <small>Remixes</small>
+                            </div>
+                        </div>
+                        <a href="profile" class="btn btn-outline-primary mt-3">Edit Profile</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card bg-primary text-white h-100">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-cloud-upload"></i> Upload New Track</h5>
+                                <p class="card-text">Share your music with the community and get feedback.</p>
+                                <a href="upload" class="btn btn-light">Upload Track</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card bg-success text-white h-100">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-music-note-list"></i> My Tracks</h5>
+                                <p class="card-text">Manage your uploaded tracks and view statistics.</p>
+                                <a href="mytracks" class="btn btn-light">View Tracks</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card bg-info text-white h-100">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-arrow-repeat"></i> My Remixes</h5>
+                                <p class="card-text">View remixes you've created and remixes of your tracks.</p>
+                                <a href="myremixes" class="btn btn-light">View Remixes</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card bg-warning text-dark h-100">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-search"></i> Explore Tracks</h5>
+                                <p class="card-text">Discover new music and get inspired for your next remix.</p>
+                                <a href="explore" class="btn btn-dark">Explore</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        @if (recentTracks.Any())
+        {
+            <div class="mt-5">
+                <h2>Your Recent Tracks</h2>
+                
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                    @foreach (var track in recentTracks)
+                    {
+                        <div class="col">
+                            <div class="card h-100 track-card">
+                                <div class="card-body">
+                                    <h5 class="card-title">@track.Title</h5>
+                                    <p class="card-text text-truncate">@track.Description</p>
+                                    <div class="mb-2">
+                                        <span class="genre-badge">@track.GenreName</span>
+                                        @if (!string.IsNullOrEmpty(track.SubgenreName))
+                                        {
+                                            <span class="genre-badge">@track.SubgenreName</span>
+                                        }
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">
+                                            <i class="bi bi-clock"></i> @FormatDuration(track.DurationSeconds)
+                                        </small>
+                                        <small class="text-muted">
+                                            <i class="bi bi-calendar3"></i> @track.UploadDate.ToString("MMM dd, yyyy")
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-transparent">
+                                    <a href="@($"track/{track.TrackId}")" class="btn btn-sm btn-primary">View Details</a>
+                                    <a href="@($"track/{track.TrackId}/edit")" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                
+                <div class="text-center mt-3">
+                    <a href="mytracks" class="btn btn-outline-primary">View All Your Tracks</a>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private UserProfileViewModel profile = new UserProfileViewModel();
+    private List<TrackViewModel> recentTracks = new List<TrackViewModel>();
+    private bool loading = true;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+    
+    private async Task LoadDataAsync()
+    {
+        loading = true;
+        
+        try
+        {
+            // Load profile and recent tracks in parallel
+            var profileTask = ProfileService.GetProfileAsync();
+            var tracksTask = ProfileService.GetUserTracksAsync();
+            
+            await Task.WhenAll(profileTask, tracksTask);
+            
+            profile = await profileTask;
+            var allTracks = await tracksTask;
+            
+            // Get the 3 most recent tracks
+            recentTracks = allTracks
+                .OrderByDescending(t => t.UploadDate)
+                .Take(3)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard data: {ex.Message}");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+    
+    private string FormatDuration(int seconds)
+    {
+        var timeSpan = TimeSpan.FromSeconds(seconds);
+        return timeSpan.TotalHours >= 1 
+            ? $"{(int)timeSpan.TotalHours}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}" 
+            : $"{timeSpan.Minutes}:{timeSpan.Seconds:D2}";
+    }
+}

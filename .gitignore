@@ -1,0 +1,37 @@
+# Build Folders
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio files
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Auto-generated files
+Generated\ Files/
+*_i.c
+*_p.c
+*_h.h
+*.ilk
+*.obj
+*.pch
+*.pdb
+*.pgc
+*.pgd
+*.rsp
+
+# NuGet packages
+*.nupkg
+packages/
+
+# .NET Tools
+.dotnet/tools/
+
+# Rider IDE
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db

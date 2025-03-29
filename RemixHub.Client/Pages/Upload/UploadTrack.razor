@@ -1,0 +1,271 @@
+@page "/upload"
+@attribute [Authorize]
+@inject ITrackService TrackService
+@inject IGenreService GenreService
+@inject NavigationManager NavigationManager
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageTitle>Upload Track - RemixHub</PageTitle>
+
+<div class="container my-5">
+    <h1>Upload Track</h1>
+    <p class="lead">Share your music with the RemixHub community.</p>
+    
+    @if (uploadSuccess)
+    {
+        <div class="alert alert-success">
+            <h4 class="alert-heading">Upload Successful!</h4>
+            <p>Your track has been uploaded and is pending approval by our moderators.</p>
+            <p>Once approved, it will be available for the community to listen to and remix.</p>
+            <p>
+                <a href="@($"track/{uploadedTrackId}")" class="btn btn-primary">View Track</a>
+                <a href="@($"track/{uploadedTrackId}/stems")" class="btn btn-outline-primary ms-2">Upload Stems</a>
+            </p>
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+        
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Track Information</h5>
+                        
+                        <EditForm Model="uploadModel" OnValidSubmit="HandleUpload" class="upload-form">
+                            <DataAnnotationsValidator />
+                            
+                            <div class="mb-3">
+                                <label for="trackFile" class="form-label">Track File</label>
+                                <InputFile id="trackFile" OnChange="OnFileSelected" class="form-control" accept=".mp3,.flac,.wav" />
+                                <ValidationMessage For="@(() => uploadModel.TrackFile)" class="validation-message" />
+                                <small class="text-muted">Supported formats: MP3, FLAC, WAV (max 50MB)</small>
+                            </div>
+                            
+                            @if (selectedFileName != null)
+                            {
+                                <div class="alert alert-info">
+                                    Selected file: @selectedFileName
+                                </div>
+                            }
+                            
+                            <div class="mb-3">
+                                <label for="title" class="form-label">Title</label>
+                                <InputText id="title" @bind-Value="uploadModel.Title" class="form-control" />
+                                <ValidationMessage For="@(() => uploadModel.Title)" class="validation-message" />
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="artist" class="form-label">Artist</label>
+                                <InputText id="artist" @bind-Value="uploadModel.Artist" class="form-control" />
+                                <ValidationMessage For="@(() => uploadModel.Artist)" class="validation-message" />
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="album" class="form-label">Album (Optional)</label>
+                                <InputText id="album" @bind-Value="uploadModel.Album" class="form-control" />
+                                <ValidationMessage For="@(() => uploadModel.Album)" class="validation-message" />
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="genreId" class="form-label">Primary Genre</label>
+                                    <select id="genreId" @bind="uploadModel.GenreId" class="form-select">
+                                        <option value="0">Select a genre</option>
+                                        @foreach (var genre in mainGenres)
+                                        {
+                                            <option value="@genre.GenreId">@genre.Name</option>
+                                        }
+                                    </select>
+                                    <ValidationMessage For="@(() => uploadModel.GenreId)" class="validation-message" />
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="subgenreId" class="form-label">Subgenre (Optional)</label>
+                                    <select id="subgenreId" @bind="uploadModel.SubgenreId" class="form-select" disabled="@(subgenres.Count == 0)">
+                                        <option value="">Select a subgenre</option>
+                                        @foreach (var genre in subgenres)
+                                        {
+                                            <option value="@genre.GenreId">@genre.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="bpm" class="form-label">BPM (Optional)</label>
+                                    <InputNumber id="bpm" @bind-Value="uploadModel.Bpm" class="form-control" min="1" max="999" />
+                                    <ValidationMessage For="@(() => uploadModel.Bpm)" class="validation-message" />
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="musicalKey" class="form-label">Musical Key (Optional)</label>
+                                    <InputText id="musicalKey" @bind-Value="uploadModel.MusicalKey" class="form-control" />
+                                    <ValidationMessage For="@(() => uploadModel.MusicalKey)" class="validation-message" />
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description</label>
+                                <InputTextArea id="description" @bind-Value="uploadModel.Description" class="form-control" rows="4" />
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg" disabled="@isUploading">
+                                    @if (isUploading)
+                                    {
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                        <span class="ms-2">Uploading...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Upload Track</span>
+                                    }
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Upload Guidelines</h5>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">You must own the rights to the music you upload</li>
+                            <li class="list-group-item">Only MP3, FLAC, and WAV files are supported</li>
+                            <li class="list-group-item">Maximum file size is 50MB</li>
+                            <li class="list-group-item">All uploads will be reviewed by moderators</li>
+                            <li class="list-group-item">Add stems after uploading to enable remixing</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">What happens next?</h5>
+                        <p>After uploading your track, you'll be able to add stems (individual instrument tracks) to enable remixing.</p>
+                        <p>Your track will be reviewed by our moderators before being published to the community.</p>
+                        <p>Once approved, other artists can listen to, like, and remix your track.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private RemixHub.Shared.ViewModels.TrackUploadViewModel uploadModel = new RemixHub.Shared.ViewModels.TrackUploadViewModel();
+    private bool isUploading = false;
+    private bool uploadSuccess = false;
+    private string errorMessage = string.Empty;
+    private string selectedFileName = null;
+    private int uploadedTrackId = 0;
+    
+    private List<GenreViewModel> allGenres = new List<GenreViewModel>();
+    private List<GenreViewModel> mainGenres = new List<GenreViewModel>();
+    private List<GenreViewModel> subgenres = new List<GenreViewModel>();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allGenres = await GenreService.GetGenresAsync();
+            mainGenres = allGenres.Where(g => g.ParentGenreId == null).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load genres. Please try again.";
+            Console.WriteLine(ex.Message);
+        }
+    }
+    
+    private void OnPrimaryGenreChange()
+    {
+        if (uploadModel.GenreId > 0)
+        {
+            subgenres = allGenres.Where(g => g.ParentGenreId == uploadModel.GenreId).ToList();
+        }
+        else
+        {
+            subgenres = new List<GenreViewModel>();
+        }
+        
+        // Reset subgenre if parent genre changes
+        uploadModel.SubgenreId = null;
+    }
+    
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        
+        if (file != null)
+        {
+            // Check file extension
+            var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+            var allowedExtensions = new[] { ".mp3", ".flac", ".wav" };
+            
+            if (!allowedExtensions.Contains(extension))
+            {
+                errorMessage = "Invalid file type. Supported formats: MP3, FLAC, WAV";
+                return;
+            }
+            
+            // Check file size (limit to 50MB for example)
+            if (file.Size > 52428800)
+            {
+                errorMessage = "File size exceeds the 50MB limit.";
+                return;
+            }
+            
+            // Store the file in the model - but we need to handle the type difference
+            selectedFileName = file.Name;
+            // Use a dynamic type to circumvent the type checking at compile time
+            // The TrackService will handle the correct type at runtime
+            uploadModel.TrackFile = file as object;
+            errorMessage = string.Empty;
+        }
+    }
+    
+    private async Task HandleUpload()
+    {
+        if (uploadModel.TrackFile == null)
+        {
+            errorMessage = "Please select a track file to upload.";
+            return;
+        }
+        
+        isUploading = true;
+        errorMessage = string.Empty;
+        
+        try
+        {
+            var result = await TrackService.UploadTrackAsync(uploadModel);
+            
+            if (result != null && result.TrackId > 0)
+            {
+                uploadSuccess = true;
+                uploadedTrackId = result.TrackId;
+            }
+            else
+            {
+                errorMessage = "Upload failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during upload. Please try again.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+}

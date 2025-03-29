@@ -1,0 +1,403 @@
+@page "/track/{TrackId:int}/remix"
+@attribute [Authorize]
+@inject ITrackService TrackService
+@inject IGenreService GenreService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create Remix - RemixHub</PageTitle>
+
+<div class="container my-5">
+    <h1>Create Remix</h1>
+    <p class="lead">Add your creative spin to this track</p>
+    
+    @if (loading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="ms-2">Loading track details...</span>
+        </div>
+    }
+    else if (originalTrack == null)
+    {
+        <div class="alert alert-warning">
+            Track not found or you don't have permission to remix it.
+        </div>
+    }
+    else
+    {
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Original Track: @originalTrack.Title</h5>
+                <h6 class="card-subtitle mb-2 text-muted">by @originalTrack.Artist</h6>
+                
+                <div class="mt-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Genre:</strong> @originalTrack.GenreName @(originalTrack.SubgenreName != null ? $"/ {originalTrack.SubgenreName}" : "")</p>
+                            <p><strong>Duration:</strong> @FormatDuration(originalTrack.DurationSeconds)</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>BPM:</strong> @(originalTrack.Bpm != null ? originalTrack.Bpm.ToString() : "Unknown")</p>
+                            <p><strong>Key:</strong> @(!string.IsNullOrEmpty(originalTrack.MusicalKey) ? originalTrack.MusicalKey : "Unknown")</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <audio controls class="w-100">
+                        <source src="@($"api/tracks/{originalTrack.TrackId}/stream")" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        @if (uploadSuccess)
+        {
+            <div class="alert alert-success">
+                <h4 class="alert-heading">Remix Uploaded Successfully!</h4>
+                <p>Your remix has been uploaded and is pending approval by our moderators.</p>
+                <p>
+                    <a href="@($"track/{remixTrackId}")" class="btn btn-primary">View Remix</a>
+                </p>
+            </div>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+            
+            @if (originalTrack.Stems != null && originalTrack.Stems.Any())
+            {
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Available Stems</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Listen to the individual stems to help with your remix:</p>
+                        
+                        <div class="row">
+                            @foreach (var stem in originalTrack.Stems)
+                            {
+                                <div class="col-md-6 mb-3">
+                                    <div class="stem-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">@stem.Name</h6>
+                                            <span class="instrument-badge">@stem.InstrumentTypeName</span>
+                                        </div>
+                                        <audio controls class="w-100 mt-2">
+                                            <source src="@($"api/tracks/{originalTrack.TrackId}/stems/{stem.StemId}")" type="audio/mpeg">
+                                            Your browser does not support the audio element.
+                                        </audio>
+                                        <div class="form-check mt-2">
+                                            <input class="form-check-input" type="checkbox" id="stem_@stem.StemId" 
+                                                   @onchange="e => ToggleStemUsage(stem.StemId, (bool)e.Value)" />
+                                            <label class="form-check-label" for="stem_@stem.StemId">
+                                                I used this stem in my remix
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+            
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Upload Your Remix</h5>
+                            
+                            <EditForm Model="remixModel" OnValidSubmit="HandleUpload" class="upload-form">
+                                <DataAnnotationsValidator />
+                                
+                                <div class="mb-3">
+                                    <label for="remixFile" class="form-label">Remix File</label>
+                                    <InputFile id="remixFile" OnChange="OnFileSelected" class="form-control" accept=".mp3,.flac,.wav" />
+                                    <ValidationMessage For="@(() => remixModel.RemixFile)" class="validation-message" />
+                                    <small class="text-muted">Supported formats: MP3, FLAC, WAV (max 50MB)</small>
+                                </div>
+                                
+                                @if (selectedFileName != null)
+                                {
+                                    <div class="alert alert-info">
+                                        Selected file: @selectedFileName
+                                    </div>
+                                }
+                                
+                                <div class="mb-3">
+                                    <label for="title" class="form-label">Remix Title</label>
+                                    <InputText id="title" @bind-Value="remixModel.Title" class="form-control" />
+                                    <ValidationMessage For="@(() => remixModel.Title)" class="validation-message" />
+                                    <small class="text-muted">E.g., "@originalTrack.Title (Your Name Remix)"</small>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="genreId" class="form-label">Genre (optional)</label>
+                                        <select id="genreId" @bind="remixModel.GenreId" class="form-select">
+                                            <option value="">Use original genre</option>
+                                            @foreach (var genre in mainGenres)
+                                            {
+                                                <option value="@genre.GenreId">@genre.Name</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-md-6 mb-3">
+                                        <label for="subgenreId" class="form-label">Subgenre (optional)</label>
+                                        <select id="subgenreId" @bind="remixModel.SubgenreId" class="form-select" disabled="@(subgenres.Count == 0)">
+                                            <option value="">Select a subgenre</option>
+                                            @foreach (var genre in subgenres)
+                                            {
+                                                <option value="@genre.GenreId">@genre.Name</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="remixReason" class="form-label">What inspired this remix?</label>
+                                    <InputTextArea id="remixReason" @bind-Value="remixModel.RemixReason" class="form-control" rows="3" />
+                                    <ValidationMessage For="@(() => remixModel.RemixReason)" class="validation-message" />
+                                    <small class="text-muted">Explain your approach and what you changed from the original</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="description" class="form-label">Description (optional)</label>
+                                    <InputTextArea id="description" @bind-Value="remixModel.Description" class="form-control" rows="3" />
+                                </div>
+                                
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary btn-lg" disabled="@isUploading">
+                                        @if (isUploading)
+                                        {
+                                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                            <span class="ms-2">Uploading...</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Upload Remix</span>
+                                        }
+                                    </button>
+                                </div>
+                            </EditForm>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Remix Guidelines</h5>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">Your remix must credit the original artist</li>
+                                <li class="list-group-item">Use stems provided or create your own interpretation</li>
+                                <li class="list-group-item">Be creative and make it your own</li>
+                                <li class="list-group-item">All remixes will be reviewed by moderators</li>
+                                <li class="list-group-item">The original artist will be notified of your remix</li>
+                            </ul>
+                            
+                            <div class="d-grid gap-2 mt-3">
+                                <a href="@($"track/{TrackId}")" class="btn btn-outline-secondary">Back to Original Track</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int TrackId { get; set; }
+    
+    private TrackDetailViewModel originalTrack;
+    private RemixCreateViewModel remixModel = new RemixCreateViewModel();
+    private HashSet<int> selectedStems = new HashSet<int>();
+    private List<GenreViewModel> allGenres = new List<GenreViewModel>();
+    private List<GenreViewModel> mainGenres = new List<GenreViewModel>();
+    private List<GenreViewModel> subgenres = new List<GenreViewModel>();
+    
+    private bool loading = true;
+    private bool isUploading = false;
+    private bool uploadSuccess = false;
+    private string errorMessage = string.Empty;
+    private string selectedFileName;
+    private int remixTrackId = 0;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+    
+    private async Task LoadDataAsync()
+    {
+        loading = true;
+        
+        try
+        {
+            // Load track and genres in parallel
+            var trackTask = TrackService.GetTrackAsync(TrackId);
+            var genresTask = GenreService.GetGenresAsync();
+            
+            await Task.WhenAll(trackTask, genresTask);
+            
+            originalTrack = await trackTask;
+            allGenres = await genresTask;
+            
+            mainGenres = allGenres.Where(g => g.ParentGenreId == null).ToList();
+            
+            // Initialize remix model
+            remixModel.Title = $"{originalTrack.Title} Remix";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+            errorMessage = "Failed to load track data. Please try again.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+    
+    private void OnPrimaryGenreChange()
+    {
+        if (remixModel.GenreId.HasValue && remixModel.GenreId.Value > 0)
+        {
+            subgenres = allGenres.Where(g => g.ParentGenreId == remixModel.GenreId.Value).ToList();
+        }
+        else
+        {
+            subgenres = new List<GenreViewModel>();
+        }
+        
+        // Reset subgenre if parent genre changes
+        remixModel.SubgenreId = null;
+    }
+    
+    private void ToggleStemUsage(int stemId, bool isUsed)
+    {
+        if (isUsed)
+        {
+            selectedStems.Add(stemId);
+        }
+        else
+        {
+            selectedStems.Remove(stemId);
+        }
+        
+        UpdateStemsUsed();
+    }
+    
+    private void UpdateStemsUsed()
+    {
+        if (selectedStems.Count == 0)
+        {
+            remixModel.StemsUsed = "No stems used";
+        }
+        else
+        {
+            var usedStems = originalTrack.Stems
+                .Where(s => selectedStems.Contains(s.StemId))
+                .Select(s => s.Name)
+                .ToList();
+                
+            remixModel.StemsUsed = string.Join(", ", usedStems);
+        }
+    }
+    
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        
+        if (file != null)
+        {
+            // Check file extension
+            var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+            var allowedExtensions = new[] { ".mp3", ".flac", ".wav" };
+            
+            if (!allowedExtensions.Contains(extension))
+            {
+                errorMessage = "Invalid file type. Supported formats: MP3, FLAC, WAV";
+                return;
+            }
+            
+            // Check file size (limit to 50MB)
+            if (file.Size > 52428800)
+            {
+                errorMessage = "File size exceeds the 50MB limit.";
+                return;
+            }
+            
+            // Store the file in the model
+            selectedFileName = file.Name;
+            remixModel.RemixFile = file;
+            errorMessage = string.Empty;
+        }
+    }
+    
+    private async Task HandleUpload()
+    {
+        if (remixModel.RemixFile == null)
+        {
+            errorMessage = "Please select a remix file to upload.";
+            return;
+        }
+        
+        if (string.IsNullOrEmpty(remixModel.RemixReason))
+        {
+            errorMessage = "Please explain what inspired your remix.";
+            return;
+        }
+        
+        // Initialize the StemsUsed property if it hasn't been set (no stems selected)
+        if (string.IsNullOrEmpty(remixModel.StemsUsed))
+        {
+            remixModel.StemsUsed = "No stems used";
+        }
+        
+        isUploading = true;
+        errorMessage = string.Empty;
+        
+        try
+        {
+            var result = await TrackService.CreateRemixAsync(TrackId, remixModel);
+            
+            if (result != null && result.TrackId > 0)
+            {
+                uploadSuccess = true;
+                remixTrackId = result.TrackId;
+            }
+            else
+            {
+                errorMessage = "Upload failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during upload. Please try again.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+    
+    private string FormatDuration(int seconds)
+    {
+        var timeSpan = TimeSpan.FromSeconds(seconds);
+        return timeSpan.TotalHours >= 1 
+            ? $"{(int)timeSpan.TotalHours}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}" 
+            : $"{timeSpan.Minutes}:{timeSpan.Seconds:D2}";
+    }
+}

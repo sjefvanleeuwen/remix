@@ -1,0 +1,347 @@
+@page "/track/{TrackId:int}/stems"
+@attribute [Authorize]
+@inject ITrackService TrackService
+@inject IInstrumentTypeService InstrumentTypeService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Upload Stems - RemixHub</PageTitle>
+
+<div class="container my-5">
+    <h1>Upload Stems</h1>
+    <p class="lead">Add individual instrument tracks to enable remixing</p>
+    
+    @if (loading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="ms-2">Loading track details...</span>
+        </div>
+    }
+    else if (track == null)
+    {
+        <div class="alert alert-warning">
+            Track not found or you don't have permission to add stems to it.
+        </div>
+    }
+    else
+    {
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Track: @track.Title</h5>
+                <h6 class="card-subtitle mb-2 text-muted">by @track.Artist</h6>
+                
+                <div class="mt-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Genre:</strong> @track.GenreName @(track.SubgenreName != null ? $"/ {track.SubgenreName}" : "")</p>
+                            <p><strong>Duration:</strong> @FormatDuration(track.DurationSeconds)</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>BPM:</strong> @(track.Bpm != null ? track.Bpm.ToString() : "Unknown")</p>
+                            <p><strong>Key:</strong> @(!string.IsNullOrEmpty(track.MusicalKey) ? track.MusicalKey : "Unknown")</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        @if (uploadSuccess)
+        {
+            <div class="alert alert-success">
+                <h4 class="alert-heading">Stem Uploaded Successfully!</h4>
+                <p>Your stem has been added to the track.</p>
+            </div>
+        }
+        
+        @if (track.Stems != null && track.Stems.Any())
+        {
+            <h3 class="mb-3">Existing Stems</h3>
+            <div class="row">
+                @foreach (var stem in track.Stems)
+                {
+                    <div class="col-md-6 mb-3">
+                        <div class="stem-item">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0">@stem.Name</h5>
+                                <span class="instrument-badge">@stem.InstrumentTypeName</span>
+                            </div>
+                            <p class="small text-muted">@stem.Description</p>
+                            
+                            <audio controls class="w-100">
+                                <source src="@($"api/tracks/{track.TrackId}/stems/{stem.StemId}")" type="audio/mpeg">
+                                Your browser does not support the audio element.
+                            </audio>
+                        </div>
+                    </div>
+                }
+            </div>
+            <hr class="my-4" />
+        }
+        
+        <h3 class="mb-3">Add New Stem</h3>
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+        
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-body">
+                        <EditForm Model="uploadModel" OnValidSubmit="HandleUpload" class="upload-form">
+                            <DataAnnotationsValidator />
+                            
+                            <div class="mb-3">
+                                <label for="stemFile" class="form-label">Stem File</label>
+                                <InputFile id="stemFile" OnChange="OnFileSelected" class="form-control" accept=".mp3,.flac,.wav" />
+                                <ValidationMessage For="@(() => uploadModel.StemFile)" class="validation-message" />
+                                <small class="text-muted">Supported formats: MP3, FLAC, WAV (max 30MB)</small>
+                            </div>
+                            
+                            @if (selectedFileName != null)
+                            {
+                                <div class="alert alert-info">
+                                    Selected file: @selectedFileName
+                                </div>
+                            }
+                            
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Stem Name</label>
+                                <InputText id="name" @bind-Value="uploadModel.Name" class="form-control" />
+                                <ValidationMessage For="@(() => uploadModel.Name)" class="validation-message" />
+                                <small class="text-muted">E.g., "Bass Line", "Vocals", "Drum Beat"</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="instrumentType" class="form-label">Instrument Type</label>
+                                <select id="instrumentType" @bind="selectedInstrumentCategoryId" class="form-select">
+                                    <option value="0">Select instrument category</option>
+                                    @foreach (var instrumentType in mainInstrumentTypes)
+                                    {
+                                        <option value="@instrumentType.InstrumentTypeId">@instrumentType.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="subInstrumentType" class="form-label">Specific Instrument</label>
+                                <select id="subInstrumentType" @bind="uploadModel.InstrumentTypeId" class="form-select" disabled="@(subInstrumentTypes.Count == 0)">
+                                    <option value="0">Select specific instrument</option>
+                                    @foreach (var instrumentType in subInstrumentTypes)
+                                    {
+                                        <option value="@instrumentType.InstrumentTypeId">@instrumentType.Name</option>
+                                    }
+                                </select>
+                                <ValidationMessage For="@(() => uploadModel.InstrumentTypeId)" class="validation-message" />
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description (Optional)</label>
+                                <InputTextArea id="description" @bind-Value="uploadModel.Description" class="form-control" rows="3" />
+                                <small class="text-muted">Add details about this stem, such as processing used, role in the track, etc.</small>
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg" disabled="@isUploading">
+                                    @if (isUploading)
+                                    {
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                        <span class="ms-2">Uploading...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Upload Stem</span>
+                                    }
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">About Stems</h5>
+                        <p>Stems are individual instrument tracks that make up your song. By uploading stems, you enable other musicians to remix your track more effectively.</p>
+                        
+                        <h6 class="mt-3">Tips for Stem Upload:</h6>
+                        <ul>
+                            <li>Use the same file format, sample rate, and bit depth as your original track</li>
+                            <li>Make sure all stems are the same length as the original track</li>
+                            <li>Properly categorize each stem by instrument type</li>
+                            <li>Include isolated stems for vocals, bass, drums, etc.</li>
+                            <li>Ensure stems are well-mixed and of high quality</li>
+                        </ul>
+                        
+                        <div class="d-grid gap-2 mt-3">
+                            <a href="@($"track/{TrackId}")" class="btn btn-outline-secondary">Back to Track</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int TrackId { get; set; }
+    
+    private TrackDetailViewModel track;
+    private StemUploadViewModel uploadModel = new StemUploadViewModel();
+    private List<InstrumentTypeViewModel> allInstrumentTypes = new List<InstrumentTypeViewModel>();
+    private List<InstrumentTypeViewModel> mainInstrumentTypes = new List<InstrumentTypeViewModel>();
+    private List<InstrumentTypeViewModel> subInstrumentTypes = new List<InstrumentTypeViewModel>();
+    private int selectedInstrumentCategoryId;
+    
+    private bool loading = true;
+    private bool isUploading = false;
+    private bool uploadSuccess = false;
+    private string errorMessage = string.Empty;
+    private string selectedFileName;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+    
+    private async Task LoadDataAsync()
+    {
+        loading = true;
+        
+        try
+        {
+            // Load track and instrument types in parallel
+            var trackTask = TrackService.GetTrackAsync(TrackId);
+            var instrumentTypesTask = InstrumentTypeService.GetInstrumentTypesAsync();
+            
+            await Task.WhenAll(trackTask, instrumentTypesTask);
+            
+            track = await trackTask;
+            allInstrumentTypes = await instrumentTypesTask;
+            
+            mainInstrumentTypes = allInstrumentTypes.Where(i => i.ParentInstrumentTypeId == null).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+            errorMessage = "Failed to load track data. Please try again.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+    
+    private void OnInstrumentCategoryChange()
+    {
+        if (selectedInstrumentCategoryId > 0)
+        {
+            subInstrumentTypes = allInstrumentTypes.Where(i => i.ParentInstrumentTypeId == selectedInstrumentCategoryId).ToList();
+        }
+        else
+        {
+            subInstrumentTypes = new List<InstrumentTypeViewModel>();
+        }
+        
+        // Reset selected specific instrument
+        uploadModel.InstrumentTypeId = 0;
+    }
+    
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        
+        if (file != null)
+        {
+            // Check file extension
+            var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+            var allowedExtensions = new[] { ".mp3", ".flac", ".wav" };
+            
+            if (!allowedExtensions.Contains(extension))
+            {
+                errorMessage = "Invalid file type. Supported formats: MP3, FLAC, WAV";
+                return;
+            }
+            
+            // Check file size (limit to 30MB for stems)
+            if (file.Size > 31457280)
+            {
+                errorMessage = "File size exceeds the 30MB limit.";
+                return;
+            }
+            
+            // Store the file in the model
+            selectedFileName = file.Name;
+            uploadModel.StemFile = file;
+            errorMessage = string.Empty;
+            
+            // Set a default name from the filename if not already set
+            if (string.IsNullOrEmpty(uploadModel.Name))
+            {
+                uploadModel.Name = Path.GetFileNameWithoutExtension(file.Name);
+            }
+        }
+    }
+    
+    private async Task HandleUpload()
+    {
+        if (uploadModel.StemFile == null)
+        {
+            errorMessage = "Please select a stem file to upload.";
+            return;
+        }
+        
+        if (uploadModel.InstrumentTypeId == 0)
+        {
+            errorMessage = "Please select an instrument type for this stem.";
+            return;
+        }
+        
+        isUploading = true;
+        errorMessage = string.Empty;
+        
+        try
+        {
+            var result = await TrackService.UploadStemAsync(TrackId, uploadModel);
+            
+            if (result != null && result.StemId > 0)
+            {
+                uploadSuccess = true;
+                
+                // Reset form
+                uploadModel = new StemUploadViewModel();
+                selectedFileName = null;
+                selectedInstrumentCategoryId = 0;
+                subInstrumentTypes = new List<InstrumentTypeViewModel>();
+                
+                // Reload track to show the new stem
+                track = await TrackService.GetTrackAsync(TrackId);
+            }
+            else
+            {
+                errorMessage = "Upload failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during upload. Please try again.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+    
+    private string FormatDuration(int seconds)
+    {
+        var timeSpan = TimeSpan.FromSeconds(seconds);
+        return timeSpan.TotalHours >= 1 
+            ? $"{(int)timeSpan.TotalHours}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}" 
+            : $"{timeSpan.Minutes}:{timeSpan.Seconds:D2}";
+    }
+}

@@ -1,0 +1,138 @@
+@page "/"
+@inject ITrackService TrackService
+@inject NavigationManager NavigationManager
+
+<PageTitle>RemixHub - Collaborative Music Sharing & Remix Platform</PageTitle>
+
+<div class="container my-5">
+    <div class="row">
+        <div class="col-lg-6">
+            <h1 class="display-4">Welcome to RemixHub</h1>
+            <p class="lead">A collaborative platform for musicians to share and remix tracks.</p>
+            <p>Upload your music, share stems, and collaborate with artists worldwide. Create amazing remixes and build on each other's creativity.</p>
+            <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                <a href="explore" class="btn btn-primary me-md-2">Explore Tracks</a>
+                <a href="register" class="btn btn-outline-secondary">Join Now</a>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <img src="images/music-collaboration.svg" alt="Music Collaboration" class="img-fluid" />
+        </div>
+    </div>
+</div>
+
+<div class="container my-5">
+    <h2 class="text-center mb-4">Featured Tracks</h2>
+    
+    @if (loading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (featuredTracks == null || !featuredTracks.Any())
+    {
+        <div class="alert alert-info">
+            No featured tracks available at the moment.
+        </div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            @foreach (var track in featuredTracks)
+            {
+                <div class="col">
+                    <div class="card h-100 track-card">
+                        <div class="card-body">
+                            <h5 class="card-title">@track.Title</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">@track.Artist</h6>
+                            <p class="card-text text-truncate">@track.Description</p>
+                            <div class="mb-2">
+                                <span class="genre-badge">@track.GenreName</span>
+                                @if (!string.IsNullOrEmpty(track.SubgenreName))
+                                {
+                                    <span class="genre-badge">@track.SubgenreName</span>
+                                }
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="bi bi-clock"></i> @FormatDuration(track.DurationSeconds)
+                                </small>
+                                <small class="text-muted">
+                                    <i class="bi bi-calendar3"></i> @track.UploadDate.ToString("MMM dd, yyyy")
+                                </small>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <a href="@($"track/{track.TrackId}")" class="btn btn-sm btn-primary w-100">View Details</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<div class="container my-5">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="text-center mb-4">
+                <i class="bi bi-cloud-upload display-1 text-primary"></i>
+                <h4 class="mt-3">Upload Your Tracks</h4>
+                <p>Share your music with the community and get feedback from other artists.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="text-center mb-4">
+                <i class="bi bi-music-note-list display-1 text-primary"></i>
+                <h4 class="mt-3">Share Stems</h4>
+                <p>Upload individual instrument tracks to allow for creative remixing.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="text-center mb-4">
+                <i class="bi bi-arrow-repeat display-1 text-primary"></i>
+                <h4 class="mt-3">Create Remixes</h4>
+                <p>Build upon other artists' work while maintaining proper attribution.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<TrackViewModel> featuredTracks;
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var filter = new TrackFilterViewModel 
+            { 
+                SortBy = "newest", 
+                PageSize = 6 
+            };
+            
+            var result = await TrackService.GetTracksAsync(filter);
+            featuredTracks = result.Tracks;
+        }
+        catch (Exception)
+        {
+            featuredTracks = new List<TrackViewModel>();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private string FormatDuration(int seconds)
+    {
+        var timeSpan = TimeSpan.FromSeconds(seconds);
+        return timeSpan.TotalHours >= 1 
+            ? $"{(int)timeSpan.TotalHours}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}" 
+            : $"{timeSpan.Minutes}:{timeSpan.Seconds:D2}";
+    }
+}

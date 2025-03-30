@@ -24,7 +24,7 @@ Generated\ Files/
 
 # NuGet packages
 *.nupkg
-packages/
+packages/                             
 
 # .NET Tools
 .dotnet/tools/
@@ -36,3 +36,5 @@ packages/
 .DS_Store
 Thumbs.db
 RemixHub.Server/RemixHub.db
+RemixHub.Server/RemixHub.db-shm
+RemixHub.Server/RemixHub.db-wal

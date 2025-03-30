@@ -174,33 +174,93 @@ namespace RemixHub.Server.Controllers
 
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user == null)
+            {
                 return Unauthorized(new { message = "Invalid email or password" });
+            }
 
-            if (!await _userManager.CheckPasswordAsync(user, model.Password))
-                return Unauthorized(new { message = "Invalid email or password" });
-
+            // Check if user's email is confirmed
             if (!user.EmailConfirmed)
+            {
                 return BadRequest(new { message = "Please verify your email before logging in" });
+            }
 
-            // Update last active timestamp
-            user.LastActive = DateTime.UtcNow;
-            await _userManager.UpdateAsync(user);
+            var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, false);
+            if (!result.Succeeded)
+            {
+                return Unauthorized(new { message = "Invalid email or password" });
+            }
 
             // Generate JWT token
-            var roles = await _userManager.GetRolesAsync(user);
-            var token = GenerateJwtToken(user, roles);
-
-            return Ok(new
+            string token = await GenerateJwtToken(user);
+            
+            // Debug and validate token structure 
+            _logger.LogInformation("Generated JWT token for user {Email}, token format valid: {IsValid}", 
+                user.Email, token.Contains(".") && token.Count(c => c == '.') == 2);
+                
+            if (!token.Contains(".") || token.Count(c => c == '.') != 2)
             {
-                token,
-                user = new
+                _logger.LogError("Invalid JWT token format generated for user {Email}: {Token}", user.Email, token);
+                return StatusCode(500, "Error generating authentication token. Please try again.");
+            }
+
+            return Ok(new 
+            {
+                Token = token,
+                User = new 
                 {
-                    id = user.Id,
-                    username = user.UserName,
-                    email = user.Email,
-                    displayName = user.DisplayName
+                    Id = user.Id,
+                    Username = user.UserName,
+                    Email = user.Email,
+                    DisplayName = user.DisplayName
                 }
             });
+        }
+
+        private async Task<string> GenerateJwtToken(ApplicationUser user)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id ?? string.Empty),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.Name, user.UserName ?? string.Empty)
+            };
+
+            var roles = await _userManager.GetRolesAsync(user);
+            foreach (var role in roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+
+            // Ensure we have a valid symmetric key
+            string jwtKey = _configuration["JwtKey"];
+            if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 16)
+            {
+                _logger.LogError("JWT key is missing or too short (must be at least 16 characters)");
+                jwtKey = "DefaultSecureKeyWithAtLeast32Chars!";
+            }
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            string configValue = _configuration["JwtExpireDays"] ?? "7"; 
+            var expires = DateTime.Now.AddDays(Convert.ToDouble(configValue));
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["JwtIssuer"],
+                audience: _configuration["JwtAudience"],
+                claims: claims,
+                expires: expires,
+                signingCredentials: creds
+            );
+
+            // Create the token string and verify it has the correct format before returning
+            string tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+            
+            // Log token structure details for debugging
+            _logger.LogDebug("JWT Token - Header: {Header}, Payload length: {PayloadLength}", 
+                token.Header.ToString(), token.Payload.Count);
+                
+            return tokenString;
         }
 
         [HttpGet("verify-email")]
@@ -278,7 +338,18 @@ namespace RemixHub.Server.Controllers
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
             var encodedToken = HttpUtility.UrlEncode(token);
             var resetLink = $"{_configuration["AppUrl"]}/reset-password?email={model.Email}&token={encodedToken}";
-            await _emailService.SendPasswordResetEmailAsync(model.Email, resetLink);
+            if (user != null && !string.IsNullOrEmpty(user.Email))
+            {
+                await _emailService.SendEmailAsync(
+                    user.Email,
+                    "Password Reset",
+                    $"Please reset your password by clicking <a href='{resetLink}'>here</a>.",
+                    true);
+            }
+            else
+            {
+                _logger.LogWarning("Password reset attempted for user with null or empty email");
+            }
             return Ok(new { message = "If your email is registered, you will receive a password reset link." });
         }
 
@@ -353,37 +424,6 @@ namespace RemixHub.Server.Controllers
             }
 
             return Ok();
-        }
-
-        private string GenerateJwtToken(ApplicationUser user, IList<string> roles)
-        {
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
-                new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
-                new Claim("DisplayName", user.DisplayName ?? user.UserName ?? string.Empty)
-            };
-
-            foreach (var role in roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-            }
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
-                _configuration["JwtKey"] ?? "defaultkeyforidevelopmentonly12345678"));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-            var expires = DateTime.Now.AddDays(Convert.ToDouble(_configuration["JwtExpireDays"] ?? "7"));
-
-            var token = new JwtSecurityToken(
-                issuer: _configuration["JwtIssuer"],
-                audience: _configuration["JwtAudience"],
-                claims: claims,
-                expires: expires,
-                signingCredentials: creds
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 

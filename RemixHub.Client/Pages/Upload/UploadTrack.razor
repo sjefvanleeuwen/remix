@@ -74,25 +74,25 @@
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label for="genreId" class="form-label">Primary Genre</label>
-                                    <select id="genreId" @bind="uploadModel.GenreId" class="form-select">
+                                    <InputSelect id="genreId" @bind-Value="uploadModel.GenreId" @bind-Value:after="OnPrimaryGenreChanged" class="form-select">
                                         <option value="0">Select a genre</option>
                                         @foreach (var genre in mainGenres)
                                         {
                                             <option value="@genre.GenreId">@genre.Name</option>
                                         }
-                                    </select>
+                                    </InputSelect>
                                     <ValidationMessage For="@(() => uploadModel.GenreId)" class="validation-message" />
                                 </div>
                                 
                                 <div class="col-md-6 mb-3">
                                     <label for="subgenreId" class="form-label">Subgenre (Optional)</label>
-                                    <select id="subgenreId" @bind="uploadModel.SubgenreId" class="form-select" disabled="@(subgenres.Count == 0)">
+                                    <InputSelect id="subgenreId" @bind-Value="uploadModel.SubgenreId" class="form-select" disabled="@(subgenres.Count == 0)">
                                         <option value="">Select a subgenre</option>
                                         @foreach (var genre in subgenres)
                                         {
                                             <option value="@genre.GenreId">@genre.Name</option>
                                         }
-                                    </select>
+                                    </InputSelect>
                                 </div>
                             </div>
                             
@@ -186,7 +186,7 @@
         }
     }
     
-    private void OnPrimaryGenreChange()
+    private void OnPrimaryGenreChanged()
     {
         if (uploadModel.GenreId > 0)
         {
@@ -197,7 +197,7 @@
             subgenres = new List<GenreViewModel>();
         }
         
-        // Reset subgenre if parent genre changes
+        // Reset subgenre when parent genre changes
         uploadModel.SubgenreId = null;
     }
     
@@ -217,18 +217,20 @@
                 return;
             }
             
-            // Check file size (limit to 50MB for example)
+            // Check file size (limit to 50MB)
             if (file.Size > 52428800)
             {
                 errorMessage = "File size exceeds the 50MB limit.";
                 return;
             }
             
-            // Store the file in the model - but we need to handle the type difference
+            // Store the file in the model
             selectedFileName = file.Name;
-            // Use a dynamic type to circumvent the type checking at compile time
-            // The TrackService will handle the correct type at runtime
-            uploadModel.TrackFile = file as object;
+            
+            // Store the actual IBrowserFile object directly
+            uploadModel.TrackFile = file;
+            
+            Console.WriteLine($"File selected: {file.Name}, Size: {file.Size} bytes, Type: {file.ContentType}");
             errorMessage = string.Empty;
         }
     }

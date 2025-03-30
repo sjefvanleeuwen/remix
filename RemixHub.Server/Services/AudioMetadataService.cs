@@ -18,7 +18,7 @@ namespace RemixHub.Server.Services
         public string Artist { get; set; } = string.Empty;
         public string Album { get; set; } = string.Empty;
         public string Genre { get; set; } = string.Empty;
-        public int DurationSeconds { get; set; }
+        public int? DurationSeconds { get; set; }
         public int BitRate { get; set; }
         public int SampleRate { get; set; }
         public int? Bpm { get; set; }

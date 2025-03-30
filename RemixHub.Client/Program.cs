@@ -11,18 +11,29 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // Server API URL - read from configuration
-var apiBaseUrl = builder.Configuration.GetValue<string>("ApiBaseUrl") ?? "https://localhost:7001";
+var apiUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5001";
 
-// HTTP client for API requests
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
+// Register the authorization message handler first
+builder.Services.AddScoped<AuthorizationMessageHandler>();
+
+// Configure HttpClient with authorization handler
+builder.Services.AddScoped(sp => 
+{
+    var handler = sp.GetRequiredService<AuthorizationMessageHandler>();
+    var httpClient = new HttpClient(handler)
+    {
+        BaseAddress = new Uri(apiUrl)
+    };
+    return httpClient;
+});
 
 // Add authentication services
 builder.Services.AddBlazoredLocalStorage();
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, JwtAuthenticationStateProvider>();
-builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Add application services
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITrackService, TrackService>();
 builder.Services.AddScoped<IGenreService, GenreService>();
 builder.Services.AddScoped<IInstrumentTypeService, InstrumentTypeService>();

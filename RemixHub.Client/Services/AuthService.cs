@@ -61,20 +61,61 @@ namespace RemixHub.Client.Services
 
         public async Task<bool> LoginAsync(LoginViewModel model)
         {
-            var response = await _httpClient.PostAsJsonAsync("api/auth/login", model);
-            
-            if (!response.IsSuccessStatusCode)
-                return false;
+            try 
+            {
+                Console.WriteLine($"Attempting login for user: {model.Email}");
+                
+                var response = await _httpClient.PostAsJsonAsync("api/auth/login", model);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"Login failed with status code: {response.StatusCode}");
+                    Console.WriteLine($"Error content: {errorContent}");
+                    return false;
+                }
 
-            var result = await response.Content.ReadFromJsonAsync<LoginResponseViewModel>();
-            
-            if (result == null || string.IsNullOrEmpty(result.Token))
-                return false;
+                var result = await response.Content.ReadFromJsonAsync<LoginResponseViewModel>();
+                
+                if (result == null || string.IsNullOrEmpty(result.Token))
+                {
+                    Console.WriteLine("Login response was successful, but token is missing");
+                    return false;
+                }
 
-            await _localStorage.SetItemAsync("authToken", result.Token);
-            ((JwtAuthenticationStateProvider)_authStateProvider).NotifyUserAuthentication(result.Token);
-            
-            return true;
+                // Validate token format
+                if (!result.Token.Contains('.') || result.Token.Count(c => c == '.') != 2)
+                {
+                    Console.WriteLine($"Server returned invalid token format: {result.Token}");
+                    return false;
+                }
+
+                Console.WriteLine($"Login successful, token length: {result.Token.Length}");
+                
+                // Store token
+                await _localStorage.SetItemAsStringAsync("authToken", result.Token);
+                
+                // Verify token was stored correctly
+                var storedToken = await _localStorage.GetItemAsStringAsync("authToken");
+                if (storedToken != result.Token)
+                {
+                    Console.WriteLine("Warning: Stored token doesn't match the received token");
+                }
+                
+                // Notify authentication state provider
+                ((JwtAuthenticationStateProvider)_authStateProvider).NotifyUserAuthentication(result.Token);
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Exception during login: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                return false;
+            }
         }
 
         public async Task<bool> LogoutAsync()

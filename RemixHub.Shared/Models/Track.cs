@@ -9,68 +9,80 @@ namespace RemixHub.Shared.Models
     {
         [Key]
         public int TrackId { get; set; }
-        
-        [Required, StringLength(100)]
+
+        [Required]
+        [StringLength(100)]
         public string Title { get; set; }
-        
+
+        [Required]
         [StringLength(100)]
         public string Artist { get; set; }
-        
+
         [StringLength(100)]
         public string Album { get; set; }
-        
-        [Required]
-        public int GenreId { get; set; }
-        
-        public int? SubgenreId { get; set; }
-        
-        [StringLength(500)]
+
+        [ForeignKey("Genre")]
+        public int? GenreId { get; set; } // Changed from int to int?
+
+        [ForeignKey("Subgenre")]
+        public int? SubgenreId { get; set; } // Already nullable
+
         public string Description { get; set; }
-        
+
+        public int? Bpm { get; set; } // Already nullable
+
+        [StringLength(10)]
+        public string MusicalKey { get; set; }
+
+        [Required]
+        public string UserId { get; set; }
+
+        [Required]
+        public DateTime UploadDate { get; set; }
+
         [Required]
         public string FilePath { get; set; }
         
+        // Adding missing properties
         public long FileSize { get; set; }
         
         [StringLength(10)]
         public string FileFormat { get; set; }
+
+        public int DurationSeconds { get; set; } // Already nullable
+
+        public int BitRate { get; set; } // Already nullable
+
+        public int SampleRate { get; set; } // Already nullable
+
+        public int Status { get; set; } // Keep this non-nullable as it's an enum value
         
-        public int DurationSeconds { get; set; }
-        
-        public int? Bpm { get; set; }
-        
-        [StringLength(10)]
-        public string MusicalKey { get; set; }
-        
-        public int BitRate { get; set; }
-        
-        public int SampleRate { get; set; }
-        
-        public DateTime UploadDate { get; set; } = DateTime.UtcNow;
-        
-        public bool IsApproved { get; set; }
-        
-        public DateTime? ApprovedDate { get; set; }
-        
-        [Required]
-        public string UserId { get; set; }
-        
+        // Property to determine approval status based on Status value
+        [NotMapped]
+        public bool IsApproved => Status == (int)TrackStatus.Approved;
+
         // Navigation properties
-        [ForeignKey("UserId")]
-        public virtual ApplicationUser User { get; set; }
-        
-        [ForeignKey("GenreId")]
         public virtual Genre Genre { get; set; }
-        
-        [ForeignKey("SubgenreId")]
         public virtual Genre Subgenre { get; set; }
+        public virtual ApplicationUser User { get; set; }
+        public virtual ICollection<Stem> Stems { get; set; }
         
-        public virtual ICollection<Stem> Stems { get; set; } = new List<Stem>();
+        // For remixes
+        public int? OriginalTrackId { get; set; }
+        [ForeignKey("OriginalTrackId")]
+        public virtual Track OriginalTrack { get; set; }
+        public virtual ICollection<Track> RemixCollection { get; set; }
         
-        // Relationships for remixes
-        public virtual ICollection<Remix> RemixesOfThis { get; set; } = new List<Remix>();
-        
-        [InverseProperty("OriginalTrack")]
-        public virtual ICollection<Remix> Remixes { get; set; } = new List<Remix>();
+        public string RemixReason { get; set; }
+        public string StemsUsed { get; set; }
+        public DateTime ApprovedDate { get; set; }
+    }
+    
+    // Enum to define possible track statuses
+    public enum TrackStatus
+    {
+        Pending = 0,
+        Approved = 1,
+        Rejected = 2
     }
 }

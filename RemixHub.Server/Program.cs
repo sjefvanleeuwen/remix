@@ -45,9 +45,33 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["JwtIssuer"] ?? "RemixHub",
-        ValidAudience = builder.Configuration["JwtAudience"] ?? "RemixHub",
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtKey"] ?? "defaultkeyforidevelopmentonly12345678"))
+        ValidIssuer = builder.Configuration["JwtIssuer"],
+        ValidAudience = builder.Configuration["JwtAudience"],
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["JwtKey"] ?? "DefaultSecureKeyWithAtLeast32Chars!"))
+    };
+
+    // Add JWT debugging events
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Token successfully validated");
+            return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning("Authentication failed: {Error}", context.Exception.Message);
+            return Task.CompletedTask;
+        },
+        OnMessageReceived = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogDebug("JWT token received: {Token}", context.Token);
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -56,14 +80,21 @@ builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddTransient<IAudioMetadataService, AudioMetadataService>();
 builder.Services.AddSingleton<ICaptchaService, CaptchaService>(); // Ensure DI picks up ILogger injection automatically
 
+// Register application services
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ICaptchaService, CaptchaService>();
+builder.Services.AddScoped<IAudioMetadataService, AudioMetadataService>();
+builder.Services.AddScoped<IFileStorageService, FileStorageService>(); // Add this line
+
 // CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("CorsPolicy", policyBuilder =>
+    options.AddDefaultPolicy(policy =>
     {
-        policyBuilder.WithOrigins("http://localhost:5002")
-                     .AllowAnyHeader()
-                     .AllowAnyMethod();
+        policy.WithOrigins(builder.Configuration["AppUrl"] ?? "http://localhost:5002")
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
@@ -82,7 +113,8 @@ else
     app.UseHsts();
 }
 
-app.UseCors("CorsPolicy");
+// Make sure CORS is applied before authentication middleware
+app.UseCors();
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

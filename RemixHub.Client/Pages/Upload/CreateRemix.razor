@@ -141,24 +141,24 @@
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <label for="genreId" class="form-label">Genre (optional)</label>
-                                        <select id="genreId" @bind="remixModel.GenreId" class="form-select">
+                                        <InputSelect id="genreId" @bind-Value="remixModel.GenreId" @bind-Value:after="OnPrimaryGenreChanged" class="form-select">
                                             <option value="">Use original genre</option>
                                             @foreach (var genre in mainGenres)
                                             {
                                                 <option value="@genre.GenreId">@genre.Name</option>
                                             }
-                                        </select>
+                                        </InputSelect>
                                     </div>
                                     
                                     <div class="col-md-6 mb-3">
                                         <label for="subgenreId" class="form-label">Subgenre (optional)</label>
-                                        <select id="subgenreId" @bind="remixModel.SubgenreId" class="form-select" disabled="@(subgenres.Count == 0)">
+                                        <InputSelect id="subgenreId" @bind-Value="remixModel.SubgenreId" class="form-select" disabled="@(subgenres.Count == 0)">
                                             <option value="">Select a subgenre</option>
                                             @foreach (var genre in subgenres)
                                             {
                                                 <option value="@genre.GenreId">@genre.Name</option>
                                             }
-                                        </select>
+                                        </InputSelect>
                                     </div>
                                 </div>
                                 
@@ -269,7 +269,7 @@
         }
     }
     
-    private void OnPrimaryGenreChange()
+    private void OnPrimaryGenreChanged()
     {
         if (remixModel.GenreId.HasValue && remixModel.GenreId.Value > 0)
         {
@@ -277,6 +277,7 @@
         }
         else
         {
+            remixModel.GenreId = null;
             subgenres = new List<GenreViewModel>();
         }
         

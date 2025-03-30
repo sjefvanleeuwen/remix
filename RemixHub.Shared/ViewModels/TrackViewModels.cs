@@ -35,13 +35,14 @@ namespace RemixHub.Shared.ViewModels
         public string Title { get; set; }
         public string Artist { get; set; }
         public string Album { get; set; }
-        public int GenreId { get; set; }
+        public int? GenreId { get; set; } // Changed from int to int? if it wasn't already
         public string GenreName { get; set; }
         public int? SubgenreId { get; set; }
         public string SubgenreName { get; set; }
         public string Description { get; set; }
         public int DurationSeconds { get; set; }
         public int? Bpm { get; set; }
+        public bool IsApproved { get; set; } // Changed from bool to int to match the Track model
         public string MusicalKey { get; set; }
         public DateTime UploadDate { get; set; }
         public string UserName { get; set; }
@@ -86,30 +87,33 @@ namespace RemixHub.Shared.ViewModels
 
     public class TrackUploadViewModel
     {
-        [Required(ErrorMessage = "Please select a track file")]
-        public object TrackFile { get; set; } // Changed from IFormFile to object to be more flexible
-
         [Required(ErrorMessage = "Title is required")]
-        [StringLength(100, ErrorMessage = "Title cannot exceed 100 characters")]
+        [StringLength(100, ErrorMessage = "Title cannot be longer than 100 characters")]
         public string Title { get; set; }
-
+        
         [Required(ErrorMessage = "Artist name is required")]
-        [StringLength(100, ErrorMessage = "Artist name cannot exceed 100 characters")]
+        [StringLength(100, ErrorMessage = "Artist name cannot be longer than 100 characters")]
         public string Artist { get; set; }
-
+        
+        [StringLength(100, ErrorMessage = "Album name cannot be longer than 100 characters")]
         public string Album { get; set; }
-
+        
         [Required(ErrorMessage = "Genre is required")]
         [Range(1, int.MaxValue, ErrorMessage = "Please select a genre")]
         public int GenreId { get; set; }
-
+        
         public int? SubgenreId { get; set; }
-
+        
         public string Description { get; set; }
-
+        
+        [Range(1, 999, ErrorMessage = "BPM must be between 1 and 999")]
         public int? Bpm { get; set; }
-
+        
+        [StringLength(10, ErrorMessage = "Musical key cannot be longer than 10 characters")]
         public string MusicalKey { get; set; }
+        
+        [Required(ErrorMessage = "Please select a track file")]
+        public object TrackFile { get; set; }
     }
 
     public class StemUploadViewModel

@@ -24,45 +24,50 @@ namespace RemixHub.Server.Data
             // Configure Track relationships
             builder.Entity<Track>()
                 .HasOne(t => t.User)
-                .WithMany(u => u.Tracks)
+                .WithMany()
                 .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Configure Track entity relationships for primary genre
             builder.Entity<Track>()
                 .HasOne(t => t.Genre)
-                .WithMany(g => g.Tracks)
+                .WithMany()
                 .HasForeignKey(t => t.GenreId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Configure Track entity relationships for subgenre
             builder.Entity<Track>()
                 .HasOne(t => t.Subgenre)
-                .WithMany(g => g.SubgenreTracks)
+                .WithMany()
                 .HasForeignKey(t => t.SubgenreId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Configure Remix relationships
-            builder.Entity<Remix>()
-                .HasOne(r => r.OriginalTrack)
-                .WithMany(t => t.RemixesOfThis)
-                .HasForeignKey(r => r.OriginalTrackId)
+            // Remix relationship - using the correct property name "Remixes" (instead of "RemixesOfThis")
+            builder.Entity<Track>()
+                .HasOne(t => t.OriginalTrack)
+                .WithMany(t => t.RemixCollection)  // Changed from RemixesOfThis to Remixes
+                .HasForeignKey(t => t.OriginalTrackId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            builder.Entity<Remix>()
-                .HasOne(r => r.RemixTrack)
-                .WithOne()
-                .HasForeignKey<Remix>(r => r.RemixTrackId)
+            // Configure Stem relationships
+            builder.Entity<Stem>()
+                .HasOne(s => s.Track)
+                .WithMany(t => t.Stems)
+                .HasForeignKey(s => s.TrackId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Configure Genre entity relationships
+            builder.Entity<Stem>()
+                .HasOne(s => s.InstrumentType)
+                .WithMany()
+                .HasForeignKey(s => s.InstrumentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure Genre relationships
             builder.Entity<Genre>()
                 .HasOne(g => g.ParentGenre)
                 .WithMany(g => g.Subgenres)
                 .HasForeignKey(g => g.ParentGenreId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Configure InstrumentType entity relationships
+            // Configure InstrumentType relationships
             builder.Entity<InstrumentType>()
                 .HasOne(i => i.ParentInstrumentType)
                 .WithMany(i => i.SubInstrumentTypes)

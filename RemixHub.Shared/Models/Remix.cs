@@ -29,5 +29,7 @@ namespace RemixHub.Shared.Models
         
         [ForeignKey("RemixTrackId")]
         public virtual Track RemixTrack { get; set; }
+
+         public ICollection<Remix> RemixesOfThis { get; set; } = new List<Remix>();
     }
 }

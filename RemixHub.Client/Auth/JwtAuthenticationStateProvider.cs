@@ -18,16 +18,68 @@ namespace RemixHub.Client.Auth
 
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            var token = await _localStorage.GetItemAsStringAsync("authToken");
-
-            if (string.IsNullOrWhiteSpace(token))
+            try
             {
+                var token = await _localStorage.GetItemAsStringAsync("authToken");
+                
+                Console.WriteLine($"Retrieved token from storage, length: {token?.Length ?? 0}");
+                
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    Console.WriteLine("No auth token found in local storage");
+                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                }
+
+                // Validate token format - JWT must have 3 segments separated by dots
+                if (!token.Contains('.') || token.Count(c => c == '.') != 2)
+                {
+                    Console.WriteLine($"Invalid JWT token format: missing segments. Token: {token}");
+                    await _localStorage.RemoveItemAsync("authToken");
+                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                }
+
+                try
+                {
+                    var claims = ParseClaimsFromJwt(token);
+                    
+                    // Log the claims for debugging
+                    foreach (var claim in claims)
+                    {
+                        Console.WriteLine($"Claim: {claim.Type} = {claim.Value}");
+                    }
+                    
+                    var expClaim = claims.FirstOrDefault(c => c.Type == "exp");
+                    
+                    if (expClaim != null)
+                    {
+                        var exp = long.Parse(expClaim.Value);
+                        var expDate = DateTimeOffset.FromUnixTimeSeconds(exp).DateTime;
+                        
+                        if (expDate <= DateTime.UtcNow)
+                        {
+                            Console.WriteLine("Auth token has expired");
+                            await _localStorage.RemoveItemAsync("authToken");
+                            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                        }
+                        
+                        Console.WriteLine($"Token valid until: {expDate}");
+                    }
+                    
+                    Console.WriteLine("Valid auth token found - user is authenticated");
+                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt")));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error parsing JWT token: {ex.Message}");
+                    await _localStorage.RemoveItemAsync("authToken");
+                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Exception in GetAuthenticationStateAsync: {ex.Message}");
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
-
-            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-
-            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt")));
         }
 
         public void NotifyUserAuthentication(string token)
@@ -54,36 +106,52 @@ namespace RemixHub.Client.Auth
         private IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
         {
             var claims = new List<Claim>();
-            var payload = jwt.Split('.')[1];
-            var jsonBytes = ParseBase64WithoutPadding(payload);
-            var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
-
-            if (keyValuePairs != null)
+            
+            try
             {
-                keyValuePairs.TryGetValue(ClaimTypes.Role, out object roles);
-
-                if (roles != null)
+                // Check for valid JWT format
+                var segments = jwt.Split('.');
+                if (segments.Length != 3)
                 {
-                    if (roles.ToString().Trim().StartsWith("["))
+                    Console.WriteLine("Invalid JWT format: incorrect number of segments");
+                    return claims;
+                }
+                
+                var payload = segments[1];
+                var jsonBytes = ParseBase64WithoutPadding(payload);
+                var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
+
+                if (keyValuePairs != null)
+                {
+                    keyValuePairs.TryGetValue(ClaimTypes.Role, out object roles);
+
+                    if (roles != null)
                     {
-                        var parsedRoles = JsonSerializer.Deserialize<string[]>(roles.ToString());
-                        if (parsedRoles != null)
+                        if (roles.ToString().Trim().StartsWith("["))
                         {
-                            foreach (var parsedRole in parsedRoles)
+                            var parsedRoles = JsonSerializer.Deserialize<string[]>(roles.ToString());
+                            if (parsedRoles != null)
                             {
-                                claims.Add(new Claim(ClaimTypes.Role, parsedRole));
+                                foreach (var parsedRole in parsedRoles)
+                                {
+                                    claims.Add(new Claim(ClaimTypes.Role, parsedRole));
+                                }
                             }
                         }
-                    }
-                    else
-                    {
-                        claims.Add(new Claim(ClaimTypes.Role, roles.ToString()));
+                        else
+                        {
+                            claims.Add(new Claim(ClaimTypes.Role, roles.ToString()));
+                        }
+
+                        keyValuePairs.Remove(ClaimTypes.Role);
                     }
 
-                    keyValuePairs.Remove(ClaimTypes.Role);
+                    claims.AddRange(keyValuePairs.Select(kvp => new Claim(kvp.Key, kvp.Value.ToString())));
                 }
-
-                claims.AddRange(keyValuePairs.Select(kvp => new Claim(kvp.Key, kvp.Value.ToString())));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error parsing JWT claims: {ex.Message}");
             }
 
             return claims;

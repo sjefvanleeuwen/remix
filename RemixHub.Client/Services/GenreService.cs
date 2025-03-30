@@ -23,10 +23,20 @@ namespace RemixHub.Client.Services
 
         public async Task<List<GenreViewModel>> GetGenresAsync()
         {
-            var response = await _httpClient.GetFromJsonAsync<List<GenreViewModel>>("api/admin/genres");
-            return response ?? new List<GenreViewModel>();
+            try
+            {
+                // Use a public endpoint instead of admin endpoint
+                var response = await _httpClient.GetFromJsonAsync<List<GenreViewModel>>("api/genres");
+                return response ?? new List<GenreViewModel>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching genres: {ex.Message}");
+                throw;
+            }
         }
 
+        // Admin-specific operations should still use admin endpoints
         public async Task<GenreViewModel> GetGenreAsync(int id)
         {
             var response = await _httpClient.GetFromJsonAsync<GenreViewModel>($"api/admin/genres/{id}");

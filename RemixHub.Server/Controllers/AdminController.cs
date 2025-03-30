@@ -68,7 +68,7 @@ namespace RemixHub.Server.Controllers
             if (track == null)
                 return NotFound();
 
-            track.IsApproved = true;
+            track.Status = (int)TrackStatus.Approved;
             track.ApprovedDate = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
